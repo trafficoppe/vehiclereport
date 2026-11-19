@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>บันทึกการซ่อมบำรุงยานพาหนะ</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body style="background-color: #f4f6f9;">
+
+    <div class="container py-4 pb-5" style="max-width: 700px;">
+        <!-- ปุ่มย้อนกลับ -->
+        <div class="mb-3">
+            <button id="btn-back" class="btn btn-link text-decoration-none fw-bold p-0" style="color: #2e5831;">
+                <i class="fa-solid fa-arrow-left me-1"></i> กลับหน้ารายการ
+            </button>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-body p-4 p-md-5 bg-white">
+                
+                <!-- ส่วนหัว: โลโก้ และ ชื่อฟอร์ม -->
+                <div class="text-center mb-4 pb-3" style="border-bottom: 2px solid #f0f0f0;">
+                    <img src="LOGO.png" alt="กองกายภาพและสิ่งแวดล้อม" style="max-width: 220px; height: auto;" class="mb-3">
+                    <h5 class="fw-bold mb-1" style="color: #2e5831;">แบบฟอร์มบันทึกการซ่อมบำรุง</h5>
+                    <small class="text-muted">สำหรับยานพาหนะงานจราจร</small>
+                </div>
+
+                <form id="maintenance-form">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">ทะเบียน / หมายเลข *</label>
+                            <input type="text" id="assetCode" class="form-control bg-light" required readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">ยี่ห้อ / รุ่น</label>
+                            <input type="text" id="model" class="form-control bg-light" readonly>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold mt-4 mb-3 p-2 text-dark" style="border-left: 4px solid #2e5831; background-color: #f8f9fa;">รายละเอียดการเข้าซ่อม</h6>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">วันที่เข้าซ่อม *</label>
+                            <input type="date" id="serviceDate" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">กำหนดซ่อมรอบถัดไป *</label>
+                            <input type="date" id="nextDueDate" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">ประเภทการซ่อมบำรุง *</label>
+                        <select id="serviceType" class="form-select border-success" required>
+                            <option value="" disabled selected>-- เลือกรายการ --</option>
+                            <option value="ถ่ายน้ำมันเครื่อง / เปลี่ยนกรอง">ถ่ายน้ำมันเครื่อง / เปลี่ยนกรอง</option>
+                            <option value="เปลี่ยนยาง / สลับยาง">เปลี่ยนยาง / สลับยาง</option>
+                            <option value="ซ่อมแซมระบบเบรก">ซ่อมแซมระบบเบรก</option>
+                            <option value="เปลี่ยนแบตเตอรี่ / ระบบไฟ">เปลี่ยนแบตเตอรี่ / ระบบไฟ</option>
+                            <option value="ตรวจเช็กระยะประจำปี">ตรวจเช็กระยะประจำปี</option>
+                            <option value="ซ่อมแซมอื่นๆ">ซ่อมแซมอื่นๆ</option>
+                        </select>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">ระยะทาง/เลขไมล์ (กม.)</label>
+                            <input type="number" id="mileage" class="form-control" placeholder="เช่น 15000">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">ค่าใช้จ่าย (บาท)</label>
+                            <input type="number" step="0.01" id="cost" class="form-control" placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">ศูนย์บริการ / อู่ที่ดำเนินการ *</label>
+                        <input type="text" id="serviceBy" class="form-control" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">รายการที่ซ่อมแซม / หมายเหตุ</label>
+                        <textarea id="note" class="form-control" rows="3"></textarea>
+                    </div>
+
+                    <button type="submit" class="btn w-100 py-3 fw-bold text-white shadow-sm rounded-3 mt-2" id="submit-btn" style="background-color: #2e5831; font-size: 16px;">
+                        <i class="fa-solid fa-wrench me-2"></i> บันทึกข้อมูลการซ่อมบำรุง
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const deptKey = urlParams.get('dept') || 'traffic';
+        document.getElementById('btn-back').onclick = () => { window.location.href = `list.html?dept=${deptKey}`; };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('assetCode').value = urlParams.get('assetCode') || '';
+            document.getElementById('model').value = urlParams.get('model') || '';
+            document.getElementById('serviceDate').valueAsDate = new Date();
+            const nextYear = new Date(); nextYear.setFullYear(nextYear.getFullYear() + 1);
+            document.getElementById('nextDueDate').valueAsDate = nextYear;
+        });
+
+        document.getElementById('maintenance-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> กำลังบันทึก...`;
+
+            const payload = {
+                action: "maintenance",
+                assetCode: document.getElementById('assetCode').value,
+                model: document.getElementById('model').value,
+                serviceDate: document.getElementById('serviceDate').value,
+                nextDueDate: document.getElementById('nextDueDate').value,
+                serviceType: document.getElementById('serviceType').value,
+                mileage: document.getElementById('mileage').value,
+                cost: document.getElementById('cost').value,
+                serviceBy: document.getElementById('serviceBy').value,
+                note: document.getElementById('note').value
+            };
+
+            try {
+                await fetch(CONFIG.GAS_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                alert('บันทึกข้อมูลเรียบร้อยแล้ว');
+                window.location.href = `list.html?dept=${deptKey}`;
+            } catch (err) {
+                alert('เกิดข้อผิดพลาด');
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-wrench me-2"></i> บันทึกข้อมูลการซ่อมบำรุง`;
+            }
+        });
+    </script>
+</body>
+</html>

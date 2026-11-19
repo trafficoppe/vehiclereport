@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>รายการยานพาหนะ</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body style="background-color: #f4f6f9;">
+
+    <div class="container py-4 pb-5" style="max-width: 800px;">
+        <!-- ปุ่มย้อนกลับ -->
+        <div class="mb-3">
+            <a href="index.html" class="text-decoration-none fw-bold" style="color: #2e5831;">
+                <i class="fa-solid fa-arrow-left me-1"></i> กลับหน้าหลัก
+            </a>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-body p-4 p-md-5 bg-white">
+                
+                <!-- ส่วนหัว: โลโก้ และ ชื่อฟอร์ม -->
+                <div class="text-center mb-4 pb-3" style="border-bottom: 2px solid #f0f0f0;">
+                    <img src="LOGO.png" alt="กองกายภาพและสิ่งแวดล้อม" style="max-width: 220px; height: auto;" class="mb-3">
+                    <h5 class="fw-bold mb-1" style="color: #2e5831;" id="dept-title-display">กำลังโหลด...</h5>
+                    <small class="text-muted">ระบบตรวจสอบ งานจราจรและความปลอดภัย</small>
+                </div>
+
+                <!-- ==================== หน้าแสดงรายการรถ ==================== -->
+                <div id="page-list">
+                    <div class="row g-2 mb-4">
+                        <div class="col-12 col-md-7">
+                            <input type="text" id="searchInput" class="form-control py-2 text-dark fw-bold bg-light" placeholder="ค้นหาตามทะเบียน, ยี่ห้อ/รุ่น, สี..." onkeyup="filterVehicles()">
+                        </div>
+                        <div class="col-12 col-md-5 d-flex gap-2">
+    <button class="btn btn-light border py-2 px-3 fw-bold text-dark shadow-sm flex-grow-1" onclick="clearCacheAndReload()">รีเฟรช</button>
+    <button class="btn py-2 px-3 fw-bold text-white shadow-sm flex-grow-1" onclick="goToAddDataPage()" style="background-color: #2e5831;">+ เพิ่มรถ</button>
+</div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0 fw-bold" style="color: #2e5831; font-size: 16px;">รายการยานพาหนะ</h6>
+                        <span id="vehicle-count" class="badge rounded-pill px-3 py-2 fs-6" style="background-color: #9ebf74; color: #fff;">0 คัน</span>
+                    </div>
+
+                    <div id="vehicle-container" class="rounded-3 bg-light p-2">
+                        <div class="text-center text-muted py-5">กำลังดึงข้อมูล...</div>
+                    </div>
+                </div>
+
+                <!-- ==================== หน้าฟอร์มตรวจรถ ==================== -->
+                <div id="page-form" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold mb-0" style="color: #2e5831;">แบบฟอร์มตรวจสภาพยานพาหนะ</h5>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" onclick="showSection('page-list')">ยกเลิก</button>
+                    </div>
+                    
+                    <form id="inspection-form">
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <label class="form-label text-muted small fw-bold">ทะเบียน / หมายเลข</label>
+                                <input type="text" class="form-control bg-light" id="vehiclePlate" readonly>
+                                <input type="hidden" id="vehicleAssetCode">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label text-muted small fw-bold">ประเภท / ยี่ห้อ</label>
+                                <input type="text" class="form-control bg-light" id="vehicleModel" readonly>
+                            </div>
+                        </div>
+                        <div class="row mb-4">
+                            <div class="col-6">
+                                <label class="form-label text-muted small fw-bold">วันที่ตรวจ</label>
+                                <input type="date" class="form-control bg-light" id="inspectionDate" readonly>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label text-muted small fw-bold">ผู้ตรวจ</label>
+                                <input type="text" class="form-control border-success" id="inspectorName" placeholder="ชื่อผู้ตรวจ" required>
+                            </div>
+                        </div>
+                        
+                        <h6 class="fw-bold mt-4 mb-3 p-2 text-dark" style="border-left: 4px solid #2e5831; background-color: #f8f9fa;">หัวข้อการตรวจสอบ (8 รายการ)</h6>
+                        
+                        <script>
+                            const items = [
+                                {id: 'body', label: '1. สภาพตัวรถ / โครงสร้างภายนอก'}, 
+                                {id: 'tires', label: '2. สภาพยางและล้อ'}, 
+                                {id: 'brakes', label: '3. ระบบเบรก (หน้า/หลัง)'}, 
+                                {id: 'lights', label: '4. ระบบไฟ (ไฟหน้า/เลี้ยว/ท้าย)'},
+                                {id: 'horn', label: '5. แตร และ สัญญาณเตือน'}, 
+                                {id: 'fluids', label: '6. ระดับน้ำมันเครื่อง / ของเหลว'},
+                                {id: 'battery', label: '7. แบตเตอรี่ / ขับเคลื่อนไฟฟ้า'}, 
+                                {id: 'engine', label: '8. สภาพเครื่องยนต์ / มอเตอร์'}
+                            ];
+                            items.forEach(item => {
+                                document.write(`
+                                <div class="mb-3 border-bottom pb-2">
+                                    <label class="fw-bold mb-2 text-dark" style="font-size: 15px;">${item.label}</label>
+                                    <div class="d-flex gap-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="${item.id}" id="${item.id}_pass" value="pass" checked onchange="toggleReason('${item.id}')">
+                                            <label class="form-check-label text-success fw-bold" for="${item.id}_pass">ปกติ</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="${item.id}" id="${item.id}_fail" value="fail" onchange="toggleReason('${item.id}')">
+                                            <label class="form-check-label text-danger fw-bold" for="${item.id}_fail">ชำรุด</label>
+                                        </div>
+                                    </div>
+                                    <input type="text" class="form-control bg-light border-danger text-danger mt-2 d-none" id="${item.id}_reason" placeholder="ระบุสาเหตุ..." style="font-size: 14px;">
+                                </div>
+                                `);
+                            });
+                        </script>
+
+                        <div class="mb-4 mt-3">
+                            <label class="form-label text-muted small fw-bold">หมายเหตุ (ถ้ามี)</label>
+                            <textarea class="form-control" id="remark" rows="2" placeholder="ระบุหมายเหตุเพิ่มเติม..."></textarea>
+                        </div>
+                        <button type="submit" class="btn w-100 py-3 fw-bold text-white shadow-sm rounded-3 mt-2" style="background-color: #2e5831; font-size: 16px;">
+                            <i class="fa-solid fa-floppy-disk me-2"></i> บันทึกข้อมูลการตรวจ
+                        </button>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal ประวัติการตรวจ (ซ่อนไว้) -->
+    <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header text-white" style="background-color: #2e5831;">
+                    <h6 class="modal-title fw-bold">ประวัติการตรวจ (<span id="historyAssetCode"></span>)</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0"><div id="historyListContainer"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>แบบฟอร์มตรวจสอบอุปกรณ์ความปลอดภัย</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body style="background-color: #f4f6f9;">
+
+    <div class="container py-4 pb-5" style="max-width: 700px;">
+        
+        <!-- ปุ่มย้อนกลับ เอามาวางเหนือการ์ดฟอร์มเล็กน้อย -->
+        <div class="mb-3">
+            <a href="index.html" class="text-decoration-none fw-bold" style="color: #2e5831;">
+                <i class="fa-solid fa-arrow-left me-1"></i> กลับหน้าหลัก
+            </a>
+        </div>
+
+        <!-- กล่องกระดาษฟอร์ม (ก้อนเดียวกันทั้งหมด) -->
+        <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-body p-4 p-md-5 bg-white">
+                
+                <!-- ส่วนหัว: โลโก้ และ ชื่อฟอร์ม -->
+                <div class="text-center mb-4 pb-3" style="border-bottom: 2px solid #f0f0f0;">
+                    <img src="LOGO.png" alt="กองกายภาพและสิ่งแวดล้อม" style="max-width: 220px; height: auto;" class="mb-3">
+                    <h5 class="fw-bold mb-1" style="color: #2e5831;">แบบฟอร์มตรวจสอบอุปกรณ์ความปลอดภัย</h5>
+                    <small class="text-muted">งานจราจรและความปลอดภัย</small>
+                </div>
+                
+                <!-- เริ่มตัวฟอร์ม -->
+                <form id="equipment-form">
+                    <div class="row mb-4">
+                        <div class="col-6">
+                            <label class="form-label text-muted small fw-bold">วันที่ตรวจ</label>
+                            <input type="date" class="form-control bg-light" id="inspectDate" readonly>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-muted small fw-bold">ผู้ตรวจ</label>
+                            <input type="text" class="form-control border-success" id="inspectorName" placeholder="ชื่อผู้ตรวจ" required>
+                        </div>
+                    </div>
+
+                    <script>
+                        const formSections = [
+                            {
+                                title: "1. อุปกรณ์จราจรและปฐมพยาบาล",
+                                items: [
+                                    {id: 'eq_light', name: 'ไฟฉุกเฉิน (ไฟสามเหลี่ยมหยุดตรวจ)'},
+                                    {id: 'eq_lock', name: 'ที่ล็อคล้อ'},
+                                    {id: 'eq_radio', name: 'วิทยุสื่อสาร'},
+                                    {id: 'eq_barrier', name: 'แผงกั้น'},
+                                    {id: 'eq_cone', name: 'กรวยยาง'},
+                                    {id: 'eq_baton', name: 'กระบองไฟ'},
+                                    {id: 'eq_firstaid', name: 'ชุดปฐมพยาบาล'},
+                                    {id: 'eq_aed', name: 'เครื่อง AED'},
+                                    {id: 'eq_board', name: 'บอร์ดหรือเปลพยาบาล'}
+                                ]
+                            }
+                        ];
+
+                        formSections.forEach(section => {
+                            // ปรับสไตล์หัวข้อให้คล้ายตัวอย่าง (มีเส้นขอบซ้าย)
+                            document.write(`<h6 class="fw-bold mt-4 mb-3 p-2 text-dark" style="border-left: 4px solid #2e5831; background-color: #f8f9fa;">${section.title}</h6>`);
+                            section.items.forEach(item => {
+                                document.write(`
+                                <div class="card mb-3 border-0 border-bottom rounded-0 shadow-none">
+                                    <div class="card-body p-2 px-3">
+                                        <label class="fw-bold mb-2 text-dark" style="font-size: 15px;">${item.name}</label>
+                                        <div class="d-flex gap-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="${item.id}" id="${item.id}_ready" value="พร้อมใช้งาน" checked 
+                                                    onchange="document.getElementById('reason_box_${item.id}').style.display='none'; document.getElementById('reason_input_${item.id}').removeAttribute('required');">
+                                                <label class="form-check-label text-success fw-bold" for="${item.id}_ready">พร้อมใช้งาน</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="${item.id}" id="${item.id}_broken" value="ชำรุด" 
+                                                    onchange="document.getElementById('reason_box_${item.id}').style.display='block'; document.getElementById('reason_input_${item.id}').setAttribute('required', 'true');">
+                                                <label class="form-check-label text-danger fw-bold" for="${item.id}_broken">ชำรุด/ไม่พร้อม</label>
+                                            </div>
+                                        </div>
+                                        
+                                        <div id="reason_box_${item.id}" style="display: none; margin-top: 12px;">
+                                            <input type="text" class="form-control bg-light border-danger text-danger" id="reason_input_${item.id}" placeholder="ระบุสาเหตุที่ชำรุดหรือระบุอาการ..." style="font-size: 14px;">
+                                        </div>
+                                    </div>
+                                </div>
+                                `);
+                            });
+                        });
+
+                        document.addEventListener("DOMContentLoaded", () => {
+                            document.getElementById('inspectDate').valueAsDate = new Date();
+                        });
+                    </script>
+
+                    <div class="mb-4 mt-4">
+                        <label class="form-label text-muted small fw-bold">2. หมายเหตุ (ถ้ามี)</label>
+                        <textarea class="form-control" id="equipmentRemark" rows="3" placeholder="ระบุหมายเหตุเพิ่มเติม..."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn w-100 py-3 fw-bold text-white shadow-sm rounded-3 mt-3" style="background-color: #2e5831; font-size: 16px;">
+                        <i class="fa-solid fa-floppy-disk me-2"></i> บันทึกข้อมูลการตรวจอุปกรณ์
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script>
+        document.getElementById('equipment-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = this.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> กำลังบันทึกข้อมูล...`;
+
+            let equipmentDetails = {};
+            const itemIds = ['eq_light', 'eq_lock', 'eq_radio', 'eq_barrier', 'eq_cone', 'eq_baton', 'eq_firstaid', 'eq_aed', 'eq_board'];
+            
+            itemIds.forEach(id => {
+                let status = "พร้อมใช้งาน";
+                if (document.getElementById(id + '_broken').checked) {
+                    let reason = document.getElementById('reason_input_' + id).value;
+                    status = "ชำรุด: " + reason;
+                }
+                equipmentDetails[id] = status;
+            });
+
+            const payload = {
+                action: "equipment_inspection",
+                inspectDate: document.getElementById('inspectDate').value,
+                inspectorName: document.getElementById('inspectorName').value,
+                remark: document.getElementById('equipmentRemark').value,
+                ...equipmentDetails
+            };
+
+            try {
+                await fetch(CONFIG.GAS_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                alert('บันทึกข้อมูลการตรวจอุปกรณ์เรียบร้อยแล้ว');
+                window.location.href = 'index.html';
+                
+            } catch (error) {
+                console.error("Error:", error);
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `<i class="fa-solid fa-floppy-disk me-2"></i> บันทึกข้อมูลการตรวจอุปกรณ์`;
+            }
+        });
+    </script>
+</body>
+</html>
