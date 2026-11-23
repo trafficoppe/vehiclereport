@@ -64,7 +64,7 @@ function openForm(assetCode, plate, model, type) {
     document.getElementById('vehicleAssetCode').value = assetCode;
     document.getElementById('vehiclePlate').value = plate !== '-' ? plate : assetCode;
     document.getElementById('vehicleModel').value = `${type} ${model}`;
-    document.getElementById('inspectionDate').valueAsDate = new Date();
+    document.getElementById('inspectionDate').value = InspectionDate.today();
     
     ['body', 'tires', 'brakes', 'lights', 'horn', 'fluids', 'battery', 'engine'].forEach(item => {
         const passRadio = document.getElementById(`${item}_pass`);
@@ -280,6 +280,13 @@ function setupForm() {
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const inspectDateField = document.getElementById('inspectionDate');
+        if (!inspectDateField.reportValidity()) return;
+        const inspectDate = inspectDateField.value;
+        if (inspectDate !== InspectionDate.today() && CONFIG.VEHICLE_INSPECTION_DATE_READY !== true) {
+            alert('ยังไม่ได้ส่งข้อมูล: ระบบบันทึกผลตรวจยานพาหนะยังไม่รองรับวันที่อื่นนอกจากวันนี้');
+            return;
+        }
 
         const submitBtn = form.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
@@ -311,6 +318,7 @@ function setupForm() {
             action: "inspection",
             vehicleAssetCode: assetCode,
             vehiclePlate: document.getElementById('vehiclePlate').value,
+            inspectDate,
             inspectorName: document.getElementById('inspectorName').value,
             checkBody: formatCheck(body, getReason('body')),
             checkTires: formatCheck(tires, getReason('tires')),
@@ -342,7 +350,7 @@ function setupForm() {
 
             sessionStorage.removeItem(CACHE_KEY);
 
-            alert('บันทึกการตรวจเรียบร้อยแล้ว');
+            alert('ส่งข้อมูลการตรวจแล้ว แต่เว็บยังยืนยันการบันทึกไม่ได้ กรุณาตรวจในประวัติ');
             showSection('page-list');
             loadVehicles(); 
 
@@ -391,11 +399,14 @@ async function showHistoryModal(assetCode) {
                     <tbody>
         `;
 
-        const currentYear = new Date().getFullYear() + 543;
+        const reportYear = Number(InspectionDate.today().slice(0, 4));
+        const currentYear = reportYear + 543;
         const months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 
         months.forEach((month, index) => {
             const logsForMonth = logs.filter(log => {
+                const chosenDate = InspectionDate.parse(log.inspectDate || log.inspectionDate);
+                if (chosenDate) return chosenDate.year === reportYear && chosenDate.month === index + 1;
                 if (!log.timestamp) return false;
                 const logParts = log.timestamp.split('/'); 
                 if(logParts.length >= 2) {

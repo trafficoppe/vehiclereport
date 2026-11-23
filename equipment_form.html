@@ -34,8 +34,8 @@
                 <form id="equipment-form">
                     <div class="row mb-4">
                         <div class="col-6">
-                            <label class="form-label text-muted small fw-bold">วันที่ตรวจ</label>
-                            <input type="date" class="form-control bg-light" id="inspectDate" readonly>
+                            <label for="inspectDate" class="form-label text-muted small fw-bold">วันที่ตรวจ</label>
+                            <input type="date" class="form-control" id="inspectDate" required>
                         </div>
                         <div class="col-6">
                             <label class="form-label text-muted small fw-bold">ผู้ตรวจ</label>
@@ -91,9 +91,6 @@
                             });
                         });
 
-                        document.addEventListener("DOMContentLoaded", () => {
-                            document.getElementById('inspectDate').valueAsDate = new Date();
-                        });
                     </script>
 
                     <div class="mb-4 mt-4">
@@ -110,9 +107,19 @@
     </div>
 
     <script src="config.js"></script>
+    <script src="inspection-date.js?v=1"></script>
     <script>
+        const inspectDateField = document.getElementById('inspectDate');
+        function resetEquipmentInspectionDate() {
+            inspectDateField.value = InspectionDate.today();
+        }
+        resetEquipmentInspectionDate();
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted) resetEquipmentInspectionDate();
+        });
         document.getElementById('equipment-form').addEventListener('submit', async function(e) {
             e.preventDefault();
+            if (!inspectDateField.reportValidity()) return;
             
             const submitBtn = this.querySelector('button[type="submit"]');
             submitBtn.disabled = true;
@@ -132,7 +139,7 @@
 
             const payload = {
                 action: "equipment_inspection",
-                inspectDate: document.getElementById('inspectDate').value,
+                inspectDate: inspectDateField.value,
                 inspectorName: document.getElementById('inspectorName').value,
                 remark: document.getElementById('equipmentRemark').value,
                 ...equipmentDetails
@@ -146,7 +153,7 @@
                     body: JSON.stringify(payload)
                 });
                 
-                alert('บันทึกข้อมูลการตรวจอุปกรณ์เรียบร้อยแล้ว');
+                alert('ส่งข้อมูลการตรวจอุปกรณ์แล้ว แต่เว็บยังยืนยันการบันทึกไม่ได้');
                 window.location.href = 'index.html';
                 
             } catch (error) {
