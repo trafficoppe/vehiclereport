@@ -210,7 +210,7 @@ function renderList(data, container, countBadge) {
           </div>
         `;
 
-        container.innerHTML += `
+        container.insertAdjacentHTML('beforeend', `
             <div class="card mb-3 shadow-sm border-0 ${borderClass} cursor-pointer" 
                  style="${cardStyle}"
                  onclick="openForm('${assetCode}', '${plate}', '${model}', '${type}')">
@@ -238,7 +238,7 @@ function renderList(data, container, countBadge) {
                                 ซ่อมบำรุง
                             </button>
                             <button class="btn btn-dark btn-sm rounded-pill fw-bold px-3 shadow-sm" style="color: #fff;"
-                                    onclick="event.stopPropagation(); showHistoryModal('${assetCode}');">
+                                    data-vehicle-history>
                                 ประวัติ
                             </button>
                         </div>
@@ -246,7 +246,16 @@ function renderList(data, container, countBadge) {
                     </div>
                 </div>
             </div>
-        `;
+        `);
+        const historyButton = container.lastElementChild.querySelector('[data-vehicle-history]');
+        historyButton.addEventListener('click', event => {
+            event.stopPropagation();
+            VehicleHistoryPdf.open({
+                assetCode, plate, type, department: DEPT_NAME,
+                assetLabel: item['หมายเลขครุภัณฑ์'] || item['หมายเลข'] || '-',
+                photos: [item['รูปภาพ_1'], item['รูปภาพ_2']]
+            }, CONFIG.GAS_URL);
+        });
     });
 
     localStorage.setItem('inspectedVehicleLog_' + DEPT_NAME, JSON.stringify(inspectedLog));
@@ -364,112 +373,3 @@ function setupForm() {
     });
 }
 
-async function showHistoryModal(assetCode) {
-    document.getElementById('historyAssetCode').innerText = assetCode;
-    const historyListContainer = document.getElementById('historyListContainer');
-    
-    historyListContainer.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 fw-normal small">กำลังโหลดประวัติ...</p></div>';
-
-    const myModal = new bootstrap.Modal(document.getElementById('historyModal'));
-    myModal.show();
-
-    try {
-        const response = await fetch(CONFIG.GAS_URL + "?action=get_vehicle_log&assetCode=" + assetCode);
-        const logs = await response.json();
-
-        let tableHTML = `
-            <div class="table-responsive border rounded">
-                <table class="table table-bordered text-center align-middle mb-0" 
-                       style="font-size: 11px; white-space: nowrap; width: 100%; color: #000;">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="font-weight: normal; padding: 6px 4px;">ด/ป</th>
-                            <th style="font-weight: normal; padding: 6px 4px;">ตัวรถ</th>
-                            <th style="font-weight: normal; padding: 6px 4px;">ยาง</th>
-                            <th style="font-weight: normal; padding: 6px 4px;">เบรก</th>
-                            <th style="font-weight: normal; padding: 6px 4px;">ไฟ</th>
-                            <th style="font-weight: normal; padding: 6px 4px;">แตร</th>
-                            <th style="font-weight: normal; padding: 6px 4px;">ของเหลว</th>
-                            <th style="font-weight: normal; padding: 6px 4px;">แบตฯ</th>
-                            <th style="font-weight: normal; padding: 6px 4px;">เครื่อง</th>
-                            <th style="font-weight: normal; padding: 6px 4px;">สถานะ</th>
-                            <th style="font-weight: normal; padding: 6px 4px;">ผู้ตรวจ</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-
-        const reportYear = Number(InspectionDate.today().slice(0, 4));
-        const currentYear = reportYear + 543;
-        const months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
-
-        months.forEach((month, index) => {
-            const logsForMonth = logs.filter(log => {
-                const chosenDate = InspectionDate.parse(log.inspectDate || log.inspectionDate);
-                if (chosenDate) return chosenDate.year === reportYear && chosenDate.month === index + 1;
-                if (!log.timestamp) return false;
-                const logParts = log.timestamp.split('/'); 
-                if(logParts.length >= 2) {
-                   const logMonth = parseInt(logParts[1], 10);
-                   return logMonth === (index + 1);
-                }
-                return false;
-            });
-
-            const logEntry = logsForMonth.length > 0 ? logsForMonth[logsForMonth.length - 1] : undefined;
-
-            if (logEntry) {
-                 const isPass = logEntry.finalStatus === "ปกติ";
-                 const tick = `<span class="text-success" style="font-weight: normal; font-size: 11px;">✓</span>`;
-                 const cross = `<span class="text-danger" style="font-weight: normal; font-size: 11px;">✗</span>`;
-                 const rowClass = isPass ? 'table-success' : 'table-danger';
-
-                 tableHTML += `
-                    <tr class="${rowClass}">
-                        <td style="font-weight: normal; padding: 6px 4px;">${month} ${currentYear.toString().substring(2)}</td>
-                        <td style="padding: 6px 4px;">${(logEntry.checkBody || "").includes("ปกติ") ? tick : cross}</td>
-                        <td style="padding: 6px 4px;">${(logEntry.checkTires || "").includes("ปกติ") ? tick : cross}</td>
-                        <td style="padding: 6px 4px;">${(logEntry.checkBrakes || "").includes("ปกติ") ? tick : cross}</td>
-                        <td style="padding: 6px 4px;">${(logEntry.checkLights || "").includes("ปกติ") ? tick : cross}</td>
-                        <td style="padding: 6px 4px;">${(logEntry.checkHorn || "").includes("ปกติ") ? tick : cross}</td>
-                        <td style="padding: 6px 4px;">${(logEntry.checkFluids || "").includes("ปกติ") ? tick : cross}</td>
-                        <td style="padding: 6px 4px;">${(logEntry.checkBattery || "").includes("ปกติ") ? tick : cross}</td>
-                        <td style="padding: 6px 4px;">${(logEntry.checkEngine || "").includes("ปกติ") ? tick : cross}</td>
-                        <td style="padding: 6px 4px;">
-                            <span class="badge ${isPass ? 'bg-success' : 'bg-danger'} shadow-sm px-2 py-1" style="font-size: 10px; font-weight: normal;">${isPass ? 'ใช้งานได้' : 'ชำรุด'}</span>
-                        </td>
-                        <td class="text-truncate" style="max-width: 70px; font-weight: normal; padding: 6px 4px;">${logEntry.inspectorName}</td>
-                    </tr>
-                `;
-            } else {
-                 tableHTML += `
-                    <tr>
-                        <td style="font-weight: normal; padding: 6px 4px;">${month} ${currentYear.toString().substring(2)}</td>
-                        <td style="color: #6c757d; padding: 6px 4px;">-</td>
-                        <td style="color: #6c757d; padding: 6px 4px;">-</td>
-                        <td style="color: #6c757d; padding: 6px 4px;">-</td>
-                        <td style="color: #6c757d; padding: 6px 4px;">-</td>
-                        <td style="color: #6c757d; padding: 6px 4px;">-</td>
-                        <td style="color: #6c757d; padding: 6px 4px;">-</td>
-                        <td style="color: #6c757d; padding: 6px 4px;">-</td>
-                        <td style="color: #6c757d; padding: 6px 4px;">-</td>
-                        <td style="color: #6c757d; padding: 6px 4px;">-</td>
-                        <td style="color: #6c757d; padding: 6px 4px;">-</td>
-                    </tr>
-                `;
-            }
-        });
-
-        tableHTML += `
-                    </tbody>
-                </table>
-            </div>
-        `;
-
-        historyListContainer.innerHTML = tableHTML;
-
-    } catch (error) {
-        console.error("Error loading history:", error);
-        historyListContainer.innerHTML = '<div class="text-center text-danger p-4" style="font-weight: normal;">เกิดข้อผิดพลาดในการดึงข้อมูล</div>';
-    }
-}
