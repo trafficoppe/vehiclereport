@@ -5,5 +5,5 @@ const CONFIG = {
     APP_NAME: 'ระบบตรวจยานพาหนะออนไลน์',
     VERSION: '1.0.0',
     // เปิดเมื่อทดสอบแล้วว่า Apps Script บันทึกและส่งคืน inspectDate ได้จริง
-    VEHICLE_INSPECTION_DATE_READY: false
+    VEHICLE_INSPECTION_DATE_READY: true
 };
