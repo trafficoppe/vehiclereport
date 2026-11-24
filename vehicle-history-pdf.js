@@ -117,7 +117,7 @@
                 if (!(u.protocol === 'https:' || (u.protocol === 'http:' && u.origin === new URL(base).origin)) || u.username || u.password || /(^|\/)images\/default\.jpg$/i.test(u.pathname)) return [];
                 // The downloaded copies use only these exact public attachment IDs. Never fall back to another vehicle.
                 const attachment = u.hostname === 'github.com' && /^\/user-attachments\/assets\/([a-f0-9-]{36})\/?$/i.exec(u.pathname);
-                if (attachment) return [new URL('photos/'+attachment[1].toLowerCase()+'.jpg',bundled).href,u.href];
+                if (attachment) return [new URL('photos/'+attachment[1].toLowerCase()+'.jpg?v=color-20261124',bundled).href,u.href];
                 if (u.hostname !== 'drive.google.com') return [u.href];
                 const id = u.searchParams.get('id') || /\/d\/([\w-]+)/.exec(u.pathname)?.[1];
                 if (!/^[\w-]{8,}$/.test(id || '')) return [u.href];
@@ -140,14 +140,10 @@
                     const canvas = document.createElement('canvas');
                     canvas.width = Math.max(1,Math.round(image.naturalWidth*scale));
                     canvas.height = Math.max(1,Math.round(image.naturalHeight*scale));
-                    const ctx = canvas.getContext('2d',{willReadFrequently:true});
+                    const ctx = canvas.getContext('2d');
                     ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
                     ctx.drawImage(image,0,0,canvas.width,canvas.height);
-                    const frame = ctx.getImageData(0,0,canvas.width,canvas.height);
-                    for (let i=0;i<frame.data.length;i+=4) {
-                        frame.data[i] = frame.data[i+1] = frame.data[i+2] = Math.round(0.299*frame.data[i]+0.587*frame.data[i+1]+0.114*frame.data[i+2]);
-                    }
-                    ctx.putImageData(frame,0,0); finish(canvas.toDataURL('image/jpeg',0.86));
+                    finish(canvas.toDataURL('image/jpeg',0.86));
                 } catch (_) {finish(null);}
             };
             image.src = url;
@@ -240,13 +236,59 @@
         setTimeout(()=>URL.revokeObjectURL(href),30000);
         return Boolean(photo) ? 'with-photo' : 'without-photo';
     }
-    function drawHistory(target, report) {
-        const wrap = document.createElement('div'); wrap.className='table-responsive';
-        const table = document.createElement('table'); table.className='table table-sm table-bordered align-middle text-center text-nowrap mb-0';
-        const head=table.createTHead().insertRow(); columns.forEach(name=>{const cell=document.createElement('th');cell.scope='col';cell.textContent=name;head.append(cell);});
-        const body=table.createTBody();
-        report.rows.forEach(r=>{const tr=body.insertRow();r.labels.forEach(s=>{const cell=tr.insertCell();cell.textContent=s;});});
-        wrap.append(table); target.replaceChildren(wrap);
+    function drawHistory(target, report, year) {
+        const wrap=document.createElement('div');wrap.className='table-responsive border rounded';
+        const table=document.createElement('table');
+        table.className='table table-bordered text-center align-middle mb-0 text-nowrap';
+        table.style.fontSize='11px';
+        const top=table.createTHead();top.className='table-light';
+        const headers=['ด/ป',...checks.map(x=>x[1]==='แบตเตอรี่'?'แบตฯ':x[1]==='เครื่องยนต์'?'เครื่อง':x[1]),'สถานะ','ผู้ตรวจ'];
+        const head=top.insertRow();
+        headers.forEach(name=>{
+            const th=document.createElement('th');th.scope='col';th.textContent=name;
+            th.className='fw-normal px-1 py-2';head.append(th);
+        });
+        const body=table.createTBody(), suffix=String(year+543).slice(-2);
+        report.rows.forEach(({labels},i)=>{
+            const [,date,...fields]=labels;
+            const items=fields.slice(0,checks.length);
+            const [overall,inspector]=fields.slice(checks.length);
+            const contradictory=overall==='ใช้งานได้'&&items.includes('ผิดปกติ');
+            const status=contradictory?'ต้องตรวจสอบ':overall;
+            const tr=body.insertRow();
+            if(status==='ใช้งานได้')tr.className='table-success';
+            if(status==='พบข้อบกพร่อง')tr.className='table-danger';
+            const month=document.createElement('th');month.scope='row';month.className='fw-normal px-1 py-2';
+            month.textContent=shortMonths[i]+' '+suffix;
+            month.title=labels[0]+' พ.ศ. '+(year+543)+(date==='-'?' · ยังไม่มีผลตรวจ':' · ตรวจล่าสุด '+date);
+            month.setAttribute('aria-label',month.title);tr.append(month);
+            items.forEach((result,k)=>{
+                const cell=tr.insertCell();cell.className='px-1 py-2';
+                if(result==='ปกติ'||result==='ผิดปกติ'){
+                    const icon=document.createElement('span'),normal=result==='ปกติ';
+                    icon.textContent=normal?'✓':'✗';icon.className=normal?'text-success':'text-danger';
+                    icon.title=checks[k][1]+': '+result;
+                    icon.setAttribute('role','img');icon.setAttribute('aria-label',icon.title);cell.append(icon);
+                }else {
+                    cell.textContent='-';cell.className+=' text-secondary';
+                    cell.setAttribute('aria-label',checks[k][1]+': ไม่มีผลที่ยืนยันได้');
+                }
+            });
+            const state=tr.insertCell();state.className='px-1 py-2';
+            if(status==='ใช้งานได้'||status==='พบข้อบกพร่อง'){
+                const badge=document.createElement('span');badge.className='badge '+(status==='ใช้งานได้'?'text-bg-success':'text-bg-danger');
+                badge.textContent=status==='ใช้งานได้'?'ใช้งานได้':'ชำรุด';state.append(badge);
+            }else if(status==='ต้องตรวจสอบ'){
+                const badge=document.createElement('span');badge.className='badge text-bg-light border text-dark';
+                badge.textContent=status;state.append(badge);
+            }else {
+                state.textContent='-';state.className+=' text-secondary';
+                state.setAttribute('aria-label',status==='ไม่มีข้อมูล'?'ไม่มีผลตรวจในเดือนนี้':'ยังไม่ยืนยันสถานะ');
+            }
+            const who=tr.insertCell();who.className='text-truncate px-1 py-2';who.style.maxWidth='86px';
+            who.textContent=inspector||'-';if(inspector&&inspector!=='-')who.title=inspector;
+        });
+        wrap.append(table);target.replaceChildren(wrap);
     }
     async function open(vehicle, gasUrl) {
         const serial = ++generation;
@@ -277,7 +319,7 @@
             const show=()=>{
                 selectedYear=+year.value;
                 currentReport=reportRows(logs,selectedYear);
-                drawHistory(container,currentReport);
+                drawHistory(container,currentReport,selectedYear);
                 status.textContent=[
                     currentReport.undated?'มี '+currentReport.undated+' รายการที่ระบุวันที่ไม่ได้ ไม่นำมารวมในรายงานรายปี':'',
                     currentReport.ambiguous?'มี '+currentReport.ambiguous+' เดือนที่ยังยืนยันลำดับรายการล่าสุดไม่ได้':''
