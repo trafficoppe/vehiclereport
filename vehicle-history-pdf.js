@@ -33,6 +33,33 @@
         if (!stamp || !dateParts(+stamp[1],+stamp[2],+stamp[3])) return null;
         return stamp[4] ? dateInBangkok(new Date(s.replace(' ','T'))) : dateParts(+stamp[1],+stamp[2],+stamp[3]);
     }
+    // Apps Script may return legacy D/M/YYYY text or a zoned ISO timestamp.
+    // No native parsing of ambiguous slash dates and no assumed arbitrary clock.
+    function parseRecordedTimestamp(raw) {
+        const value=text(raw);
+        const slash=/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})[ ,T]+(\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(?:\s*([AP]M))?$/i.exec(value);
+        const iso=/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(Z|[+-]\d{2}:?\d{2})?$/i.exec(value);
+        const m=slash||iso;
+        if(!m)return null;
+        const y=slash?(m[3].length===2?+m[3]+2500:+m[3]):+m[1];
+        const d=dateParts(y,+m[2],+(slash?m[1]:m[3]));
+        let hh=+m[4],min=+m[5],sec=+(m[6]||0),ms=+(m[7]||'').padEnd(3,'0');
+        if(slash&&m[8]){
+            if(hh<1||hh>12)return null;
+            hh=(hh%12)+(m[8].toUpperCase()==='PM'?12:0);
+        }
+        if(!d||hh>23||min>59||sec>59)return null;
+        let offset=7*60;
+        if(iso&&m[8]){
+            if(m[8].toUpperCase()==='Z')offset=0;
+            else{
+                const n=m[8].slice(1).replace(':',''),oh=+n.slice(0,2),om=+n.slice(2);
+                if(oh>23||om>59)return null;
+                offset=(m[8][0]==='-'?-1:1)*(oh*60+om);
+            }
+        }
+        return Date.UTC(d.year,d.month-1,d.day,hh,min,sec,ms)-offset*60000;
+    }
     function mark(v, overall = false) {
         const s = text(v);
         if (/^(?:ปกติ|ใช้งานได้)$/.test(s)) return overall ? 'ใช้งานได้' : 'ปกติ';
@@ -43,26 +70,43 @@
     function scopedLogs(raw, vehicle) {
         const assetCode = text(vehicle.assetCode), department = text(vehicle.department);
         if (!Array.isArray(raw) || !assetCode || assetCode === '-' || !department) throw Error('ไม่พบข้อมูลรถที่ใช้จัดทำรายงาน');
-        return raw.flatMap((record, sequence) => {
+        return raw.flatMap(record => {
             if (!record || text(record.vehicleAssetCode) !== assetCode || text(record.department) !== department) return [];
             const chosen = text(record.inspectDate) || text(record.inspectionDate);
             const d = chosen ? parseDate(chosen) : parseDate(record.timestamp, true);
-            return [{record, sequence, date:d}];
+            return [{record, date:d, recordedAt:parseRecordedTimestamp(record.timestamp)}];
         });
     }
     function reportRows(logs, year) {
-        const dated = logs.filter(r => r.date?.year === year).sort((a,b) => a.date.key.localeCompare(b.date.key) || a.sequence-b.sequence);
-        const bins = Array.from({length:12}, () => []);
-        dated.forEach(row => bins[row.date.month-1].push(row));
-        const rows = bins.flatMap((bin,i) => bin.length ? bin.map(row => {
-            const {record, date} = row;
-            const labels = [months[i],formatDate(date),...checks.map(([key])=>mark(record[key])),mark(record.finalStatus,true),text(record.inspectorName)||'-'];
-            return {labels, details: [
-                ...checks.flatMap(([key,name])=>mark(record[key])==='ผิดปกติ' ? [name + ': ' + text(record[key])] : []),
-                ...(text(record.note) ? ['หมายเหตุ: ' + text(record.note)] : [])
-            ]};
-        }) : [{labels:[months[i],...Array(9).fill('-'),'ไม่มีข้อมูล','-'], details:[]}]);
-        return {rows, months:bins.filter(x => x.length).length, count:dated.length, undated:logs.length-logs.filter(r=>r.date).length};
+        const bins=Array.from({length:12},()=>[]);
+        for(const row of logs){
+            if(row.date?.year!==year)continue;
+            const bin=bins[row.date.month-1];
+            if(!bin.length||row.date.key>bin[0].date.key)bins[row.date.month-1]=[row];
+            else if(row.date.key===bin[0].date.key)bin.push(row);
+        }
+        const project=({record,date},i)=>({
+            labels:[months[i],formatDate(date),...checks.map(([key])=>mark(record[key])),mark(record.finalStatus,true),text(record.inspectorName)||'-'],
+            details:[
+                ...checks.flatMap(([key,name])=>mark(record[key])==='ผิดปกติ'?[name+': '+text(record[key])]:[]),
+                ...(text(record.note)?['หมายเหตุ: '+text(record.note)]:[])
+            ]
+        });
+        let ambiguous=0;
+        const rows=bins.map((bin,i)=>{
+            if(!bin.length)return {labels:[months[i],...Array(9).fill('-'),'ไม่มีข้อมูล','-'],details:[]};
+            // Use source clock, never a status preference or unverified array order.
+            const known=bin.filter(x=>x.recordedAt!==null);
+            const last=known.reduce((v,r)=>Math.max(v,r.recordedAt),-Infinity);
+            const candidates=bin.filter(x=>x.recordedAt===null||x.recordedAt===last);
+            const display=candidates.map(x=>project(x,i));
+            if(display.every(x=>JSON.stringify(x)===JSON.stringify(display[0])))return display[0];
+            ambiguous++;
+            return {labels:[months[i],formatDate(bin[0].date),...Array(8).fill('-'),'ต้องตรวจสอบ','-'],
+                details:['มีหลายรายการในวันเดียวกันที่ยังยืนยันลำดับล่าสุดไม่ได้']};
+        });
+        const monthsWithData=bins.filter(x=>x.length).length;
+        return {rows,months:monthsWithData,count:monthsWithData-ambiguous,ambiguous,undated:logs.filter(r=>!r.date).length};
     }
     function photoCandidates(source, base, bundled = new URL('assets/vehicle-pdf/', base)) {
         return Array.from(new Set(source.flatMap(raw => {
@@ -142,7 +186,7 @@
                     {text:[{text:'รหัสทรัพย์สิน: ',bold:true},text(vehicle.assetLabel ?? vehicle.assetCode)||'-']},
                     {text:[{text:'ประเภท: ',bold:true},text(vehicle.type)||'-']}
                 ]]},layout:thin},
-                {text:[{text:'สรุป: ',bold:true},'มีข้อมูล '+report.months+' เดือน · ตรวจทั้งหมด '+report.count+' ครั้ง  |  ข้อมูล ณ วันที่ '+formatDate(footDate)],margin:[0,7,0,4]},
+                {text:[{text:'สรุป: ',bold:true},'มีข้อมูล '+report.months+' เดือน · แสดงผลล่าสุดเดือนละ 1 รายการ  |  ข้อมูล ณ วันที่ '+formatDate(footDate)],margin:[0,7,0,4]},
                 {table:{headerRows:1,dontBreakRows:true,widths:[67,78,47,43,44,43,42,55,56,61,90,'*'],body:[
                     columns.map((s,i)=>({text:s,bold:true,alignment:i===0?'left':'center'})),...report.rows.map(row)
                 ]},layout:thin},
@@ -229,15 +273,22 @@
             const years=[...new Set([current,...logs.flatMap(r=>r.date?[r.date.year]:[])])].sort((a,b)=>b-a);
             years.forEach(y=>{const opt=document.createElement('option');opt.value=y;opt.textContent='พ.ศ. '+(y+543);year.append(opt);});
             year.value=current; year.disabled=false; button.disabled=false;
-            let busy=false;
-            const show=()=>{const report=reportRows(logs,+year.value);drawHistory(container,report);
-                status.textContent=report.undated ? 'มี '+report.undated+' รายการที่ระบุวันที่ไม่ได้ ไม่นำมารวมในรายงานรายปี' : '';};
+            let busy=false, currentReport, selectedYear;
+            const show=()=>{
+                selectedYear=+year.value;
+                currentReport=reportRows(logs,selectedYear);
+                drawHistory(container,currentReport);
+                status.textContent=[
+                    currentReport.undated?'มี '+currentReport.undated+' รายการที่ระบุวันที่ไม่ได้ ไม่นำมารวมในรายงานรายปี':'',
+                    currentReport.ambiguous?'มี '+currentReport.ambiguous+' เดือนที่ยังยืนยันลำดับรายการล่าสุดไม่ได้':''
+                ].filter(Boolean).join(' · ');
+            };
             year.onchange=show; show();
             button.onclick=async ()=>{
                 if (!active() || busy) return;
                 busy=true; button.disabled=true; year.disabled=true; status.textContent='กำลังจัดทำ PDF...';
                 try {
-                    const result=await download(vehicle,+year.value,reportRows(logs,+year.value),active);
+                    const result=await download(vehicle,selectedYear,currentReport,active);
                     if (active() && result) status.textContent=result==='with-photo'?'ดาวน์โหลด PDF แล้ว':'ดาวน์โหลด PDF แล้ว (ไม่สามารถฝังรูปยานพาหนะได้)';
                 } catch (_) {
                     if (active()) status.textContent='สร้างไฟล์ PDF ไม่สำเร็จ กรุณาลองอีกครั้ง';
@@ -248,5 +299,5 @@
         }
     }
     window.VehicleHistoryPdf={open};
-    if (typeof module !== 'undefined') module.exports={scopedLogs,parseDate,reportRows,makeDocument,photoCandidates,filename,mark};
+    if (typeof module !== 'undefined') module.exports={scopedLogs,parseDate,parseRecordedTimestamp,reportRows,makeDocument,photoCandidates,filename,mark};
 })(typeof window==='undefined' ? globalThis : window);
