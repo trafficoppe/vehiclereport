@@ -13,6 +13,33 @@ const DEPT_MAP = {
 
 const DEPT_NAME = DEPT_MAP[deptKey] || "งานจราจรและความปลอดภัย";
 const CACHE_KEY = "gasVehicleData_" + DEPT_NAME;
+let fleetSnapshot = [], fleetExportBusy = false, vehicleLoadVersion = 0;
+
+function updateFleetPdfButton() {
+    document.getElementById('fleet-pdf').disabled = fleetExportBusy || !fleetSnapshot.length;
+}
+
+async function exportFleetPdf() {
+    if (!fleetSnapshot.length || fleetExportBusy) return;
+    const vehicles = fleetSnapshot.slice();
+    const status = document.getElementById('fleet-pdf-status');
+    const message = value => { status.hidden = false; status.textContent = value; };
+    fleetExportBusy = true;
+    updateFleetPdfButton();
+    message('กำลังเตรียมรายงาน PDF ทุกคันในหน่วยงานนี้...');
+    try {
+        const result = await VehicleHistoryPdf.downloadFleet(vehicles, CONFIG.GAS_URL, (done, count) => {
+            message(done < count ? 'เตรียมข้อมูล ' + done + ' จาก ' + count + ' คัน...' : 'กำลังสร้างไฟล์ PDF รวม...');
+        });
+        message('ดาวน์โหลด PDF รวม ' + result.count + ' คัน ปี พ.ศ. ' + (result.year + 543) + ' แล้ว' +
+            (result.missingPhotos ? ' · ไม่มีรูปที่ใช้ได้ ' + result.missingPhotos + ' คัน' : ''));
+    } catch (error) {
+        message(error.message || 'สร้าง PDF รวมไม่สำเร็จ กรุณาลองอีกครั้ง');
+    } finally {
+        fleetExportBusy = false;
+        updateFleetPdfButton();
+    }
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     const titleDisplay = document.getElementById('dept-title-display');
@@ -20,6 +47,7 @@ document.addEventListener("DOMContentLoaded", () => {
         titleDisplay.innerHTML = DEPT_NAME; 
     }
 
+    document.getElementById("fleet-pdf").addEventListener("click", exportFleetPdf);
     loadVehicles();
     setupForm();
 });
@@ -96,6 +124,10 @@ function toggleReason(item) {
 }
 
 async function loadVehicles() {
+    const version = ++vehicleLoadVersion;
+    fleetSnapshot = [];
+    updateFleetPdfButton();
+    if (!fleetExportBusy) document.getElementById("fleet-pdf-status").hidden = true;
     const container = document.getElementById('vehicle-container');
     const countBadge = document.getElementById('vehicle-count');
 
@@ -128,14 +160,25 @@ async function loadVehicles() {
         if (!response.ok) throw new Error('Vehicle list unavailable');
         const allData = await response.json();
         
-        if (allData.error) throw new Error(allData.error);
+        if (version !== vehicleLoadVersion) return;
+        if (!Array.isArray(allData)) throw new Error(allData?.error || "Invalid vehicle list");
 
         const filtered = allData.filter(item => item['หน่วยงาน'] === DEPT_NAME);
 
         sessionStorage.setItem(CACHE_KEY, JSON.stringify(filtered));
         renderList(filtered, container, countBadge);
+        fleetSnapshot = filtered.map(item => ({
+            assetCode: item['หมายเลข'] || item['ทะเบียน'] || '-',
+            plate: item['ทะเบียน'] || '-',
+            type: item['ประเภท'] || '-',
+            department: DEPT_NAME,
+            assetLabel: item['หมายเลขครุภัณฑ์'] || item['หมายเลข'] || '-',
+            photos: [item['รูปภาพ_1'], item['รูปภาพ_2']]
+        }));
+        updateFleetPdfButton();
 
     } catch (error) {
+        if (version !== vehicleLoadVersion) return;
         console.error("Fetch Error:", error);
         if (!hasCache) {
             container.innerHTML = `

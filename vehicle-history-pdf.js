@@ -192,6 +192,18 @@
             ]
         };
     }
+    function makeFleetDocument(entries, year, now = new Date()) {
+        const first = makeDocument(entries[0].vehicle,year,entries[0].report,entries[0].photo,now);
+        return {...first,info:{title:'รายงานประวัติการตรวจยานพาหนะรวม',subject:text(entries[0].vehicle.department)},
+            content:entries.map(({vehicle,report,photo},i)=>({
+                ...(i ? {pageBreak:'before'} : {}),
+                stack:[
+                    {text:text(vehicle.department)+'  |  คันที่ '+(i+1)+' / '+entries.length,fontSize:11,alignment:'right',margin:[0,0,0,4]},
+                    ...(i ? makeDocument(vehicle,year,report,photo,now).content : first.content)
+                ]
+            }))
+        };
+    }
     const assetBase = typeof document === 'undefined' ? null : new URL('assets/vehicle-pdf/',document.currentScript.src);
     let fontPrep, generation = 0, authFetch;
     function toBase64(bytes) {
@@ -205,7 +217,7 @@
         if (!fontPrep) {
             const names = ['THSarabunNew.ttf','THSarabunNewBold.ttf'];
             fontPrep = Promise.all(names.map(async name => {
-                const res = await fetch(new URL(name,assetBase),{redirect:'error'});
+                const res = await fetch(new URL(name,assetBase),{redirect:'error',signal:AbortSignal.timeout(12000)});
                 if (!res.ok) throw Error('โหลดฟอนต์รายงานไม่สำเร็จ');
                 return [name,toBase64(await res.arrayBuffer())];
             })).then(files=>{
@@ -223,18 +235,85 @@
     async function download(vehicle, year, report, stillCurrent) {
         const [,photo] = await Promise.all([prepareFonts(),selectedPhoto(vehicle)]);
         if (!stillCurrent()) return false;
-        const pdf = window.pdfMake.createPdf(makeDocument(vehicle,year,report,photo));
-        const blob = await new Promise((resolve,reject)=>{
+        const blob = await createPdfBlob(makeDocument(vehicle,year,report,photo));
+        if (!blob || !stillCurrent()) return false;
+        saveBlob(blob,filename(vehicle,year));
+        return Boolean(photo) ? 'with-photo' : 'without-photo';
+    }
+    function createPdfBlob(definition) {
+        const pdf = window.pdfMake.createPdf(definition);
+        return new Promise((resolve,reject)=>{
             let result;
             try {result = pdf.getBlob(resolve);} catch (e) {reject(e);}
             if (result && typeof result.catch === 'function') result.catch(reject);
         });
-        if (!blob || !stillCurrent()) return false;
+    }
+    function saveBlob(blob, name) {
         const href = URL.createObjectURL(blob), link = document.createElement('a');
-        link.href = href; link.download = filename(vehicle,year);
+        link.href = href; link.download = name;
         document.body.appendChild(link); link.click(); link.remove();
         setTimeout(()=>URL.revokeObjectURL(href),30000);
-        return Boolean(photo) ? 'with-photo' : 'without-photo';
+    }
+    async function fetchFleetReport(vehicle, year, gasUrl, groupSignal) {
+        const url = new URL(gasUrl);
+        url.searchParams.set('action','get_vehicle_log');
+        url.searchParams.set('assetCode',vehicle.assetCode);
+        const ctl=new AbortController(), abort=()=>ctl.abort();
+        if(groupSignal.aborted) abort();
+        groupSignal.addEventListener('abort',abort,{once:true});
+        const timeout=setTimeout(abort,12000);
+        try {
+            const response=await fetch(url,{cache:'no-store',signal:ctl.signal});
+            if(!response.ok)throw Error('history unavailable');
+            const raw=await response.json();
+            const logs=scopedLogs(raw,vehicle);
+            if(raw.length&&!logs.length)throw Error('mismatched history');
+            return reportRows(logs,year);
+        } finally {
+            clearTimeout(timeout);
+            groupSignal.removeEventListener('abort',abort);
+        }
+    }
+    async function downloadFleet(vehicles, gasUrl, progress = ()=>{}) {
+        if (!vehicles.length) throw Error('ไม่พบรถสำหรับจัดทำ PDF');
+        const department=text(vehicles[0].department), seen=new Set();
+        for(const vehicle of vehicles){
+            const code=text(vehicle.assetCode);
+            if(!department||text(vehicle.department)!==department||!code||code==='-'||seen.has(code)){
+                throw Error('ยังสร้าง PDF รวมไม่ได้: พบรหัสรถว่างหรือซ้ำในรายการ กรุณาตรวจสอบทะเบียนรถ');
+            }
+            seen.add(code);
+        }
+        const now=new Date(), year=dateInBangkok(now).year;
+        const ctl=new AbortController(), entries=new Array(vehicles.length);
+        let next=0, done=0;
+        const worker=async ()=>{
+            while(!ctl.signal.aborted&&next<vehicles.length){
+                const i=next++, vehicle=vehicles[i];
+                try {
+                    const report=await fetchFleetReport(vehicle,year,gasUrl,ctl.signal);
+                    if(ctl.signal.aborted)return;
+                    const photo=await selectedPhoto(vehicle);
+                    if(ctl.signal.aborted)return;
+                    entries[i]={vehicle,report,photo};
+                    progress(++done,vehicles.length);
+                } catch (error) {
+                    if(ctl.signal.aborted)return;
+                    throw Error('โหลดประวัติรถ '+(vehicle.plate==='-'?vehicle.assetCode:vehicle.plate)+' ไม่สำเร็จ จึงยังไม่ได้ดาวน์โหลดไฟล์ กรุณาลองอีกครั้ง');
+                }
+            }
+        };
+        let blob;
+        try {
+            await Promise.all([prepareFonts(),...Array.from({length:Math.min(3,vehicles.length)},worker)]);
+            blob=await createPdfBlob(makeFleetDocument(entries,year,now));
+            if(!blob||!blob.size)throw Error('สร้างไฟล์ PDF ไม่สำเร็จ');
+        } catch(error) {
+            ctl.abort();
+            throw Error(error.message && /[\u0E00-\u0E7F]/.test(error.message) ? error.message : 'สร้างไฟล์ PDF รวมไม่สำเร็จ กรุณาลองอีกครั้ง');
+        }
+        saveBlob(blob,'ประวัติการตรวจยานพาหนะ-ทุกคัน-'+(year+543)+'.pdf');
+        return {count:entries.length,year,missingPhotos:entries.filter(entry=>!entry.photo).length};
     }
     function drawHistory(target, report, year) {
         const wrap=document.createElement('div');wrap.className='table-responsive border rounded';
@@ -346,6 +425,6 @@
             if (active()) container.textContent='โหลดประวัติคันนี้ไม่ได้ กรุณาเปิดใหม่แล้วลองอีกครั้ง';
         } finally {clearTimeout(timeout);}
     }
-    window.VehicleHistoryPdf={open};
-    if (typeof module !== 'undefined') module.exports={scopedLogs,parseDate,parseRecordedTimestamp,reportRows,makeDocument,photoCandidates,filename,mark};
+    window.VehicleHistoryPdf={open,downloadFleet};
+    if (typeof module !== 'undefined') module.exports={scopedLogs,parseDate,parseRecordedTimestamp,reportRows,makeDocument,makeFleetDocument,photoCandidates,filename,mark};
 })(typeof window==='undefined' ? globalThis : window);

@@ -41,8 +41,10 @@
                         <div class="vehicle-tools-actions">
                             <button type="button" class="eq-button" onclick="clearCacheAndReload()">รีเฟรช</button>
                             <button type="button" class="eq-button eq-primary" onclick="goToAddDataPage()">+ เพิ่มรถ</button>
+                            <button type="button" id="fleet-pdf" class="eq-button" aria-label="PDF รายงานประวัติการตรวจยานพาหนะทุกคัน" aria-describedby="fleet-pdf-status" disabled>PDF</button>
                         </div>
                     </div>
+                    <p id="fleet-pdf-status" role="status" aria-live="polite" class="eq-description mb-2" hidden></p>
                     <div id="vehicle-container" class="eq-items vehicle-items">
                         <div class="text-center text-muted py-5">กำลังดึงข้อมูล...</div>
                     </div>
@@ -151,7 +153,7 @@
     <script src="config.js"></script>
     <script src="inspection-date.js?v=1"></script>
     <script src="assets/vehicle-pdf/pdfmake.min.js" defer></script>
-    <script src="vehicle-history-pdf.js?v=20261125-history-timeout"></script>
-    <script src="script.js?v=20261125-vehicle-theme"></script>
+    <script src="vehicle-history-pdf.js?v=20261125-fleet-pdf"></script>
+    <script src="script.js?v=20261125-fleet-pdf"></script>
 </body>
 </html>
