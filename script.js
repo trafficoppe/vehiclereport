@@ -64,7 +64,9 @@ function openForm(assetCode, plate, model, type) {
     document.getElementById('vehicleAssetCode').value = assetCode;
     document.getElementById('vehiclePlate').value = plate !== '-' ? plate : assetCode;
     document.getElementById('vehicleModel').value = `${type} ${model}`;
-    document.getElementById('inspectionDate').value = InspectionDate.today();
+    const dateField = document.getElementById('inspectionDate');
+    dateField.max = InspectionDate.today();
+    dateField.value = dateField.max;
     
     ['body', 'tires', 'brakes', 'lights', 'horn', 'fluids', 'battery', 'engine'].forEach(item => {
         const passRadio = document.getElementById(`${item}_pass`);
@@ -119,8 +121,11 @@ async function loadVehicles() {
         countBadge.innerText = '...';
     }
 
+    const listController = new AbortController();
+    const listTimeout = setTimeout(() => listController.abort(), 12000);
     try {
-        const response = await fetch(CONFIG.GAS_URL);
+        const response = await fetch(CONFIG.GAS_URL, {signal: listController.signal});
+        if (!response.ok) throw new Error('Vehicle list unavailable');
         const allData = await response.json();
         
         if (allData.error) throw new Error(allData.error);
@@ -141,6 +146,8 @@ async function loadVehicles() {
                 </div>`;
             countBadge.innerText = `Error`;
         }
+    } finally {
+        clearTimeout(listTimeout);
     }
 }
 

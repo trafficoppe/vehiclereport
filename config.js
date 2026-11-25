@@ -1,6 +1,8 @@
 const CONFIG = {
     // 1. ลิงก์ Web App จาก Google Apps Script (เปลี่ยนที่นี่ที่เดียว)
     GAS_URL: 'https://script.google.com/macros/s/AKfycbwFhnq_sP0ZzFhxJzLTAefBSJX9o2ol6hZVLujYARLc8zsR5gi6wL2xg-FjAfZZd9CfZA/exec',
+    // Set only after a source for equipment repairs and its access are verified.
+    EQUIPMENT_REPAIR_HISTORY_URL: '',
     APK_LINK: 'https://example.com/download/vehicle-app.apk',
     APP_NAME: 'ระบบตรวจยานพาหนะออนไลน์',
     VERSION: '1.0.0',

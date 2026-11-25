@@ -304,6 +304,12 @@
         if (window.bootstrap.Modal.getOrCreateInstance) window.bootstrap.Modal.getOrCreateInstance(modal).show();
         else new window.bootstrap.Modal(modal).show();
         modal.addEventListener('hidden.bs.modal',()=>ctl.abort(),{once:true});
+        const timeout=setTimeout(()=>{
+            if (active()) {
+                ctl.abort();
+                container.textContent='โหลดประวัติเกินเวลาที่กำหนด กรุณาปิดแล้วลองใหม่';
+            }
+        },12000);
         try {
             const url=new URL(gasUrl); url.searchParams.set('action','get_vehicle_log'); url.searchParams.set('assetCode',vehicle.assetCode);
             const response=await fetch(url,{signal:ctl.signal,cache:'no-store'});
@@ -338,7 +344,7 @@
             };
         } catch (_) {
             if (active()) container.textContent='โหลดประวัติคันนี้ไม่ได้ กรุณาเปิดใหม่แล้วลองอีกครั้ง';
-        }
+        } finally {clearTimeout(timeout);}
     }
     window.VehicleHistoryPdf={open};
     if (typeof module !== 'undefined') module.exports={scopedLogs,parseDate,parseRecordedTimestamp,reportRows,makeDocument,photoCandidates,filename,mark};

@@ -7,11 +7,12 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="equipment-history.css?v=4">
 </head>
 <body style="background-color: #f4f6f9;">
 
     <div class="container py-4 pb-5" style="max-width: 700px;">
-        
+
         <!-- ปุ่มย้อนกลับ เอามาวางเหนือการ์ดฟอร์มเล็กน้อย -->
         <div class="mb-3">
             <a href="index.html" class="text-decoration-none fw-bold" style="color: #2e5831;">
@@ -22,23 +23,38 @@
         <!-- กล่องกระดาษฟอร์ม (ก้อนเดียวกันทั้งหมด) -->
         <div class="card border-0 shadow-sm rounded-3">
             <div class="card-body p-4 p-md-5 bg-white">
-                
+
                 <!-- ส่วนหัว: โลโก้ และ ชื่อฟอร์ม -->
                 <div class="text-center mb-4 pb-3" style="border-bottom: 2px solid #f0f0f0;">
                     <img src="LOGO.png" alt="กองกายภาพและสิ่งแวดล้อม" style="max-width: 220px; height: auto;" class="mb-3">
                     <h5 class="fw-bold mb-1" style="color: #2e5831;">แบบฟอร์มตรวจสอบอุปกรณ์ความปลอดภัย</h5>
                     <small class="text-muted">งานจราจรและความปลอดภัย</small>
                 </div>
-                
+
                 <!-- เริ่มตัวฟอร์ม -->
-                <form id="equipment-form">
+                <section id="equipment-inventory">
+  <div class="eq-toolbar"><h2>อุปกรณ์จราจรและปฐมพยาบาล</h2><button type="button" id="equipment-start" class="eq-button eq-primary">เริ่มตรวจอุปกรณ์</button></div>
+  <p id="equipment-list-scope" class="eq-intro">เลือกรายการเพื่อเปิดฟอร์มที่ข้อนั้น ตรวจครบทั้ง 9 รายการก่อนบันทึก</p>
+  <div id="equipment-items" class="eq-items"></div>
+</section>
+<dialog id="repair-history" aria-labelledby="repair-title">
+  <div class="eq-toolbar"><h2 id="repair-title"></h2><button id="repair-close" class="eq-button" type="button">ปิด</button></div>
+  <p id="repair-state" role="status" aria-live="polite"></p>
+  <div class="table-responsive" id="repair-table" hidden>
+    <table class="table table-sm"><thead><tr><th scope="col">วันที่ซ่อม</th><th scope="col">รายการซ่อมบำรุง</th><th scope="col">ผล / สถานะ</th></tr></thead><tbody id="repair-rows"></tbody></table>
+  </div>
+  <button id="repair-pdf" class="eq-button eq-primary" type="button" hidden>ดาวน์โหลด PDF</button>
+</dialog>
+                <form id="equipment-form" hidden>
+                    <button type="button" id="equipment-return" class="eq-button mb-3">กลับรายการอุปกรณ์</button>
+                    <p id="equipment-scope" class="alert alert-light border py-2">แบบฟอร์มนี้ใช้ตรวจและบันทึกผลทั้ง 9 รายการ ปุ่มตรวจบนการ์ดเป็นทางลัดไปยังรายการที่เลือกเท่านั้น</p>
                     <div class="row mb-4">
                         <div class="col-6">
                             <label for="inspectDate" class="form-label text-muted small fw-bold">วันที่ตรวจ</label>
                             <input type="date" class="form-control" id="inspectDate" required>
                         </div>
                         <div class="col-6">
-                            <label class="form-label text-muted small fw-bold">ผู้ตรวจ</label>
+                            <label for="inspectorName" class="form-label text-muted small fw-bold">ผู้ตรวจ</label>
                             <input type="text" class="form-control border-success" id="inspectorName" placeholder="ชื่อผู้ตรวจ" required>
                         </div>
                     </div>
@@ -48,15 +64,15 @@
                             {
                                 title: "1. อุปกรณ์จราจรและปฐมพยาบาล",
                                 items: [
-                                    {id: 'eq_light', name: 'ไฟฉุกเฉิน (ไฟสามเหลี่ยมหยุดตรวจ)'},
-                                    {id: 'eq_lock', name: 'ที่ล็อคล้อ'},
-                                    {id: 'eq_radio', name: 'วิทยุสื่อสาร'},
-                                    {id: 'eq_barrier', name: 'แผงกั้น'},
-                                    {id: 'eq_cone', name: 'กรวยยาง'},
-                                    {id: 'eq_baton', name: 'กระบองไฟ'},
-                                    {id: 'eq_firstaid', name: 'ชุดปฐมพยาบาล'},
-                                    {id: 'eq_aed', name: 'เครื่อง AED'},
-                                    {id: 'eq_board', name: 'บอร์ดหรือเปลพยาบาล'}
+                                    {id: 'eq_light', name: 'ไฟฉุกเฉิน (ไฟสามเหลี่ยมหยุดตรวจ)', description: 'ตรวจสภาพตัวโคมและทดลองเปิดไฟสัญญาณ'},
+                                    {id: 'eq_lock', name: 'ที่ล็อคล้อ', description: 'ตรวจสภาพตัวล็อกและลองล็อก–ปลดล็อก'},
+                                    {id: 'eq_radio', name: 'วิทยุสื่อสาร', description: 'ทดลองเปิดเครื่อง รับ–ส่งเสียง และตรวจระดับแบตเตอรี่'},
+                                    {id: 'eq_barrier', name: 'แผงกั้น', description: 'ตรวจโครงแผงกั้นและความมั่นคงเมื่อตั้งวาง'},
+                                    {id: 'eq_cone', name: 'กรวยยาง', description: 'ตรวจสภาพตัวกรวย ฐาน และแถบสะท้อนแสง'},
+                                    {id: 'eq_baton', name: 'กระบองไฟ', description: 'ตรวจสภาพกระบองและทดลองเปิดไฟ'},
+                                    {id: 'eq_firstaid', name: 'ชุดปฐมพยาบาล', description: 'ตรวจความครบถ้วน สภาพ และวันหมดอายุของวัสดุ'},
+                                    {id: 'eq_aed', name: 'เครื่อง AED', description: 'ดูไฟแสดงสถานะความพร้อม และตรวจวันหมดอายุของแผ่นนำไฟฟ้า'},
+                                    {id: 'eq_board', name: 'บอร์ดหรือเปลพยาบาล', description: 'ตรวจสภาพบอร์ดหรือเปลและสายรัดที่มี'}
                                 ]
                             }
                         ];
@@ -68,20 +84,21 @@
                                 document.write(`
                                 <div class="card mb-3 border-0 border-bottom rounded-0 shadow-none">
                                     <div class="card-body p-2 px-3">
-                                        <label class="fw-bold mb-2 text-dark" style="font-size: 15px;">${item.name}</label>
+                                        <h3 class="fw-bold mb-2 text-dark" style="font-size: 15px;">${item.name}</h3>
+                                        <p class="eq-description">${item.description}</p>
                                         <div class="d-flex gap-4">
                                             <div class="form-check">
-                                                <input class="form-check-input" type="radio" name="${item.id}" id="${item.id}_ready" value="พร้อมใช้งาน" checked 
+                                                <input class="form-check-input" type="radio" name="${item.id}" id="${item.id}_ready" value="พร้อมใช้งาน" checked
                                                     onchange="document.getElementById('reason_box_${item.id}').style.display='none'; document.getElementById('reason_input_${item.id}').removeAttribute('required');">
                                                 <label class="form-check-label text-success fw-bold" for="${item.id}_ready">พร้อมใช้งาน</label>
                                             </div>
                                             <div class="form-check">
-                                                <input class="form-check-input" type="radio" name="${item.id}" id="${item.id}_broken" value="ชำรุด" 
+                                                <input class="form-check-input" type="radio" name="${item.id}" id="${item.id}_broken" value="ชำรุด"
                                                     onchange="document.getElementById('reason_box_${item.id}').style.display='block'; document.getElementById('reason_input_${item.id}').setAttribute('required', 'true');">
                                                 <label class="form-check-label text-danger fw-bold" for="${item.id}_broken">ชำรุด/ไม่พร้อม</label>
                                             </div>
                                         </div>
-                                        
+
                                         <div id="reason_box_${item.id}" style="display: none; margin-top: 12px;">
                                             <input type="text" class="form-control bg-light border-danger text-danger" id="reason_input_${item.id}" placeholder="ระบุสาเหตุที่ชำรุดหรือระบุอาการ..." style="font-size: 14px;">
                                         </div>
@@ -98,8 +115,13 @@
                         <textarea class="form-control" id="equipmentRemark" rows="3" placeholder="ระบุหมายเหตุเพิ่มเติม..."></textarea>
                     </div>
 
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="equipment-review" required>
+                        <label class="form-check-label" for="equipment-review">ยืนยันว่าตรวจและทบทวนผลครบทั้ง 9 รายการแล้ว</label>
+                    </div>
+
                     <button type="submit" class="btn w-100 py-3 fw-bold text-white shadow-sm rounded-3 mt-3" style="background-color: #2e5831; font-size: 16px;">
-                        <i class="fa-solid fa-floppy-disk me-2"></i> บันทึกข้อมูลการตรวจอุปกรณ์
+                        <i class="fa-solid fa-floppy-disk me-2"></i> บันทึกผลตรวจทั้ง 9 รายการ
                     </button>
                 </form>
             </div>
@@ -108,26 +130,42 @@
 
     <script src="config.js"></script>
     <script src="inspection-date.js?v=1"></script>
+    <script src="assets/vehicle-pdf/pdfmake.min.js" defer></script>
+    <script src="equipment-history.js?v=4" defer></script>
     <script>
         const inspectDateField = document.getElementById('inspectDate');
         function resetEquipmentInspectionDate() {
-            inspectDateField.value = InspectionDate.today();
+            inspectDateField.max = InspectionDate.today();
+            inspectDateField.value = inspectDateField.max;
         }
+        const reviewField = document.getElementById('equipment-review');
+        const equipmentForm = document.getElementById('equipment-form');
+        equipmentForm.addEventListener('input', event => {
+            if (event.target !== reviewField) reviewField.checked = false;
+        });
         resetEquipmentInspectionDate();
         window.addEventListener('pageshow', (event) => {
-            if (event.persisted) resetEquipmentInspectionDate();
+            if (event.persisted) {
+                resetEquipmentInspectionDate();
+                reviewField.checked = false;
+            }
         });
-        document.getElementById('equipment-form').addEventListener('submit', async function(e) {
+        equipmentForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            if (!inspectDateField.reportValidity()) return;
-            
+            const selectedDate = inspectDateField.value;
+            if (!inspectDateField.reportValidity() || !reviewField.reportValidity()) return;
+            if (!InspectionDate.parse(selectedDate) || selectedDate > InspectionDate.today()) {
+                alert('กรุณาเลือกวันที่ตรวจที่ไม่เกินวันนี้');
+                return;
+            }
+
             const submitBtn = this.querySelector('button[type="submit"]');
             submitBtn.disabled = true;
             submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> กำลังบันทึกข้อมูล...`;
 
             let equipmentDetails = {};
             const itemIds = ['eq_light', 'eq_lock', 'eq_radio', 'eq_barrier', 'eq_cone', 'eq_baton', 'eq_firstaid', 'eq_aed', 'eq_board'];
-            
+
             itemIds.forEach(id => {
                 let status = "พร้อมใช้งาน";
                 if (document.getElementById(id + '_broken').checked) {
@@ -139,7 +177,7 @@
 
             const payload = {
                 action: "equipment_inspection",
-                inspectDate: inspectDateField.value,
+                inspectDate: selectedDate,
                 inspectorName: document.getElementById('inspectorName').value,
                 remark: document.getElementById('equipmentRemark').value,
                 ...equipmentDetails
@@ -152,15 +190,15 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                
+
                 alert('ส่งข้อมูลการตรวจอุปกรณ์แล้ว แต่เว็บยังยืนยันการบันทึกไม่ได้');
                 window.location.href = 'index.html';
-                
+
             } catch (error) {
                 console.error("Error:", error);
                 alert('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง');
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = `<i class="fa-solid fa-floppy-disk me-2"></i> บันทึกข้อมูลการตรวจอุปกรณ์`;
+                submitBtn.innerHTML = `<i class="fa-solid fa-floppy-disk me-2"></i> บันทึกผลตรวจทั้ง 9 รายการ`;
             }
         });
     </script>
