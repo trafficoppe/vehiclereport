@@ -180,13 +180,13 @@
                 {table:{widths:['*','*','*'],body:[[
                     {text:[{text:'ทะเบียน: ',bold:true},text(vehicle.plate)||'-']},
                     {text:[{text:'รหัสทรัพย์สิน: ',bold:true},text(vehicle.assetLabel ?? vehicle.assetCode)||'-']},
-                    {text:[{text:'ประเภท: ',bold:true},text(vehicle.type)||'-']}
+                    {text:[{text:'ประเภท: ',bold:true},text(vehicle.type)||'-',...(text(vehicle.color)?[' | สี: '+text(vehicle.color).replace(/^สี\s*/, '')]:[])]}
                 ]]},layout:thin},
-                {text:[{text:'สรุป: ',bold:true},'มีข้อมูล '+report.months+' เดือน · แสดงผลล่าสุดเดือนละ 1 รายการ  |  ข้อมูล ณ วันที่ '+formatDate(footDate)],margin:[0,7,0,4]},
+                {text:report.identityIssue ? [{text:'ยังยืนยันประวัติแยกรายคันไม่ได้: ',bold:true},report.identityIssue] : [{text:'สรุป: ',bold:true},'มีข้อมูล '+report.months+' เดือน · แสดงผลล่าสุดเดือนละ 1 รายการ  |  ข้อมูล ณ วันที่ '+formatDate(footDate)],margin:[0,7,0,4]},
                 {table:{headerRows:1,dontBreakRows:true,widths:[67,78,47,43,44,43,42,55,56,61,90,'*'],body:[
                     columns.map((s,i)=>({text:s,bold:true,alignment:i===0?'left':'center'})),...report.rows.map(row)
                 ]},layout:thin},
-                {text:[{text:'คำอธิบาย: ',bold:true},'ปกติ = ผลตรวจปกติ   ·   ผิดปกติ = พบข้อบกพร่อง   ·   ขีด (-) = ไม่มีข้อมูล ไม่ได้หมายความว่าตรวจผ่าน'],margin:[0,7,0,3]},
+                {text:[{text:'คำอธิบาย: ',bold:true},report.identityIssue ? 'ขีด (-) = ไม่แสดงผลตรวจ เพราะยังผูกประวัติกับรถคันนี้ไม่ได้' : 'ปกติ = ผลตรวจปกติ   ·   ผิดปกติ = พบข้อบกพร่อง   ·   ขีด (-) = ไม่มีข้อมูล ไม่ได้หมายความว่าตรวจผ่าน'],margin:[0,7,0,3]},
                 ...(report.undated ? [{text:'ไม่นำ '+report.undated+' รายการที่ระบุวันที่ตรวจไม่ได้มารวมในปีที่เลือก',margin:[0,0,0,3]}] : []),
                 ...(details.length ? [{text:'รายละเอียดข้อบกพร่องและหมายเหตุ',bold:true,margin:[0,2,0,1]},...details] : [])
             ]
@@ -276,13 +276,11 @@
     }
     async function downloadFleet(vehicles, gasUrl, progress = ()=>{}) {
         if (!vehicles.length) throw Error('ไม่พบรถสำหรับจัดทำ PDF');
-        const department=text(vehicles[0].department), seen=new Set();
+        const department=text(vehicles[0].department), counts=new Map();
         for(const vehicle of vehicles){
+            if(!department||text(vehicle.department)!==department) throw Error('หน่วยงานของรถไม่ตรงกัน กรุณาเปิดรายการใหม่');
             const code=text(vehicle.assetCode);
-            if(!department||text(vehicle.department)!==department||!code||code==='-'||seen.has(code)){
-                throw Error('ยังสร้าง PDF รวมไม่ได้: พบรหัสรถว่างหรือซ้ำในรายการ กรุณาตรวจสอบทะเบียนรถ');
-            }
-            seen.add(code);
+            if(code&&code!=='-')counts.set(code,(counts.get(code)||0)+1);
         }
         const now=new Date(), year=dateInBangkok(now).year;
         const ctl=new AbortController(), entries=new Array(vehicles.length);
@@ -291,7 +289,17 @@
             while(!ctl.signal.aborted&&next<vehicles.length){
                 const i=next++, vehicle=vehicles[i];
                 try {
-                    const report=await fetchFleetReport(vehicle,year,gasUrl,ctl.signal);
+                    const code=text(vehicle.assetCode);
+                    const identityIssue=!code||code==='-' ? 'ไม่มีรหัสที่ใช้ค้นผลตรวจ' :
+                        counts.get(code)>1 ? 'รหัสที่ใช้ค้นผลตรวจซ้ำกับรถคันอื่น จึงไม่แสดงประวัติร่วมเป็นผลตรวจของคันนี้' : '';
+                    let report;
+                    if(identityIssue){
+                        report=reportRows([],year);
+                        report.identityIssue=identityIssue;
+                        report.rows.forEach(row=>{row.labels[10]='ยังไม่ยืนยัน';});
+                    }else{
+                        report=await fetchFleetReport({...vehicle,assetCode:code},year,gasUrl,ctl.signal);
+                    }
                     if(ctl.signal.aborted)return;
                     const photo=await selectedPhoto(vehicle);
                     if(ctl.signal.aborted)return;
@@ -313,7 +321,7 @@
             throw Error(error.message && /[\u0E00-\u0E7F]/.test(error.message) ? error.message : 'สร้างไฟล์ PDF รวมไม่สำเร็จ กรุณาลองอีกครั้ง');
         }
         saveBlob(blob,'ประวัติการตรวจยานพาหนะ-ทุกคัน-'+(year+543)+'.pdf');
-        return {count:entries.length,year,missingPhotos:entries.filter(entry=>!entry.photo).length};
+        return {count:entries.length,year,missingPhotos:entries.filter(entry=>!entry.photo).length,unconfirmed:entries.filter(entry=>entry.report.identityIssue).length};
     }
     function drawHistory(target, report, year) {
         const wrap=document.createElement('div');wrap.className='table-responsive border rounded';

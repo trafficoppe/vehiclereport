@@ -32,6 +32,7 @@ async function exportFleetPdf() {
             message(done < count ? 'เตรียมข้อมูล ' + done + ' จาก ' + count + ' คัน...' : 'กำลังสร้างไฟล์ PDF รวม...');
         });
         message('ดาวน์โหลด PDF รวม ' + result.count + ' คัน ปี พ.ศ. ' + (result.year + 543) + ' แล้ว' +
+            (result.unconfirmed ? ' · ยังยืนยันประวัติแยกรายคันไม่ได้ ' + result.unconfirmed + ' คัน (ระบุในรายงาน)' : '') +
             (result.missingPhotos ? ' · ไม่มีรูปที่ใช้ได้ ' + result.missingPhotos + ' คัน' : ''));
     } catch (error) {
         message(error.message || 'สร้าง PDF รวมไม่สำเร็จ กรุณาลองอีกครั้ง');
@@ -171,6 +172,7 @@ async function loadVehicles() {
             assetCode: item['หมายเลข'] || item['ทะเบียน'] || '-',
             plate: item['ทะเบียน'] || '-',
             type: item['ประเภท'] || '-',
+            color: item['สี'] || '',
             department: DEPT_NAME,
             assetLabel: item['หมายเลขครุภัณฑ์'] || item['หมายเลข'] || '-',
             photos: [item['รูปภาพ_1'], item['รูปภาพ_2']]
