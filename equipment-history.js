@@ -1,7 +1,7 @@
 (() => {
  'use strict';
  const $=id=>document.getElementById(id);
- const items=formSections.flatMap(s=>s.items), inventory=$('equipment-inventory'), form=$('equipment-form'), dialog=$('repair-history');
+ const items=formSections.flatMap(s=>s.items.filter(item=>item.active!==false)), inventory=$('equipment-inventory'), form=$('equipment-form'), dialog=$('repair-history');
  const list=$('equipment-items'), state=$('repair-state'), wrap=$('repair-table'), tbody=$('repair-rows'), pdf=$('repair-pdf');
  const dateFmt=new Intl.DateTimeFormat('th-TH-u-ca-buddhist-nu-latn',{timeZone:'UTC',day:'numeric',month:'short',year:'numeric'});
  const dateLabel=s=>dateFmt.format(new Date(s+'T00:00:00Z'));
@@ -33,15 +33,7 @@
    return {date:r.date,work:r.work.trim(),result:r.result.trim()};
   }).sort((a,b)=>b.date.localeCompare(a.date));
  }
- async function open(item,from){
-  const seq=++ticket;active?.abort();current=null;opener=from;tbody.replaceChildren();wrap.hidden=pdf.hidden=true;pdf.disabled=false;
-  $('repair-title').textContent='ประวัติการซ่อม: '+item.name;
-  if(!dialog.open)dialog.showModal();
-  $('repair-close').focus();
-  const endpoint=CONFIG.EQUIPMENT_REPAIR_HISTORY_URL;
-  if(!endpoint){message('ยังไม่ได้เชื่อมแหล่งประวัติซ่อมของอุปกรณ์รายการนี้ จึงยังบอกไม่ได้ว่ามีประวัติหรือไม่');return;}
-  message('กำลังโหลดประวัติการซ่อม…');
-  const controller=new AbortController();active=controller;
+ async function getRepairs(item,endpoint,controller){
   const timeout=setTimeout(()=>controller.abort(),12000);
   try{
    const url=new URL(endpoint);
@@ -50,14 +42,28 @@
    url.searchParams.set('itemId',item.id);
    const response=await fetch(url,{credentials:'include',cache:'no-store',signal:controller.signal,headers:{Accept:'application/json'}});
    if(!response.ok)throw Error('อ่านประวัติการซ่อมไม่ได้');
-   const rows=normalize(item.id,await response.json());
+   return normalize(item.id,await response.json());
+  }finally{clearTimeout(timeout);}
+ }
+ const missingSource='ยังไม่ได้เชื่อมแหล่งประวัติการซ่อม จึงยังยืนยันไม่ได้ว่ามีประวัติหรือไม่';
+ async function open(item,from){
+  const seq=++ticket;active?.abort();current=null;opener=from;tbody.replaceChildren();wrap.hidden=pdf.hidden=true;pdf.disabled=false;
+  $('repair-title').textContent='ประวัติการซ่อม: '+item.name;
+  if(!dialog.open)dialog.showModal();
+  $('repair-close').focus();
+  const endpoint=CONFIG.EQUIPMENT_REPAIR_HISTORY_URL;
+  if(!endpoint){message(missingSource);return;}
+  message('กำลังโหลดประวัติการซ่อม…');
+  const controller=new AbortController();active=controller;
+  try{
+   const rows=await getRepairs(item,endpoint,controller);
    if(seq!==ticket)return;
    current={item,rows};pdf.hidden=false;
    for(const row of rows){const tr=term('tr');tr.append(term('td',dateLabel(row.date)),term('td',row.work),term('td',row.result||'—'));tbody.append(tr);}
    wrap.hidden=!rows.length;
    message(rows.length?'พบ '+rows.length+' รายการ':'ยังไม่มีประวัติการซ่อมที่บันทึกไว้');
   }catch(_){if(seq===ticket)message('โหลดประวัติการซ่อมไม่ได้ กรุณาตรวจการเชื่อมต่อหรือสิทธิ์ แล้วเปิดใหม่อีกครั้ง',true);}
-  finally{clearTimeout(timeout);if(seq===ticket)active=null;}
+  finally{if(seq===ticket)active=null;}
  }
  for(const [i,item] of items.entries()){
   const card=term('article','','eq-item'), head=term('div','','eq-item-label');
@@ -65,7 +71,7 @@
   head.append(term('span',String(i+1).padStart(2,'0'),'eq-order'),description);
   const action=term('button','ประวัติการซ่อม','eq-button eq-secondary');action.type='button';
   action.setAttribute('aria-label','ประวัติการซ่อม '+item.name);action.addEventListener('click',()=>open(item,action));
-  const inspect=term('button','ตรวจ','eq-button eq-primary');inspect.type='button';inspect.setAttribute('aria-label','เริ่มตรวจทั้ง 9 รายการ ที่ '+item.name);inspect.setAttribute('aria-describedby','equipment-list-scope');
+  const inspect=term('button','ตรวจ','eq-button eq-primary');inspect.type='button';inspect.setAttribute('aria-label','เริ่มตรวจทั้ง '+items.length+' รายการ ที่ '+item.name);inspect.setAttribute('aria-describedby','equipment-list-scope');
   inspect.addEventListener('click',()=>setPanel(true,item,inspect));
   const actions=term('div','','eq-item-actions');actions.append(action,inspect);card.append(head,actions);list.append(card);
  }
@@ -77,19 +83,87 @@
   })).then(Object.fromEntries).catch(e=>{fonts=null;throw e;});
   return fonts;
  }
+ function pdfDefinition(entries, connected){
+  const title=connected?'ประวัติการซ่อมอุปกรณ์ความปลอดภัย':'รายการอุปกรณ์ความปลอดภัย (ยังไม่เชื่อมประวัติซ่อม)';
+  const content=[
+   {text:title,alignment:'center',bold:true,fontSize:22},
+   {text:'งานจราจรและความปลอดภัย',alignment:'center',fontSize:17,margin:[0,0,0,12]}
+  ];
+  if(entries.length>1)content.push({text:'อุปกรณ์ทั้งหมด '+entries.length+' รายการ',bold:true,margin:[0,0,0,8]});
+  if(!connected){
+   content.push({text:missingSource,margin:[0,0,0,8]});
+   content.push({table:{headerRows:1,dontBreakRows:true,widths:[38,170,'*'],body:[
+    ['ลำดับ','อุปกรณ์','สิ่งที่ตรวจ'].map(text=>({text,bold:true})),
+    ...entries.map(({item},i)=>[String(i+1),item.name,item.description])
+   ]}});
+  }else{
+   for(const [index,{item,rows}] of entries.entries()){
+    content.push({text:(entries.length>1?(index+1)+'. ':'')+item.name,bold:true,fontSize:17,margin:[0,9,0,4],headlineLevel:1});
+    if(rows.length)content.push({table:{headerRows:1,dontBreakRows:true,widths:[80,'*',115],body:[
+     ['วันที่ซ่อม','รายการซ่อมบำรุง','ผล / สถานะ'].map(text=>({text,bold:true})),
+     ...rows.map(row=>[dateLabel(row.date),row.work,row.result||'—'])
+    ]}});
+    else content.push({text:'ยังไม่มีประวัติการซ่อมที่บันทึกไว้',margin:[0,0,0,4]});
+   }
+  }
+  return {pageSize:'A4',pageMargins:[34,36,34,45],info:{title},defaultStyle:{font:'Sarabun',fontSize:15},content,
+   pageBreakBefore:(node,following)=>node.headlineLevel===1&&following.length===0,
+   footer:(p,n)=>({text:'หน้า '+p+' / '+n,alignment:'right',margin:[0,8,34,0]})};
+ }
+ async function savePdf(entries,connected,name,canSave=()=>true){
+  const vfs=await fontFiles();
+  if(!canSave())return false;
+  const builder=window.pdfMake.createPdf(pdfDefinition(entries,connected),undefined,
+   {Sarabun:{normal:'THSarabunNew.ttf',bold:'THSarabunNewBold.ttf'}},vfs);
+  const blob=await new Promise((resolve,reject)=>{
+   const result=builder.getBlob(resolve);if(result?.catch)result.catch(reject);
+  });
+  if(!blob?.size)throw Error('PDF is empty');
+  if(!canSave())return false;
+  const href=URL.createObjectURL(blob), link=term('a');
+  link.href=href;link.download=name;document.body.append(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(href),30000);
+  return true;
+ }
  pdf.addEventListener('click',async()=>{
   if(!current||pdf.disabled)return;
   const target=current,generation=ticket;pdf.disabled=true;
   try{
-   const vfs=await fontFiles();
-   if(generation!==ticket)return;
-   const headers=['วันที่ซ่อม','รายการซ่อมบำรุง','ผล / สถานะ'].map(text=>({text,bold:true}));
-   const body=[headers,...target.rows.map(r=>[dateLabel(r.date),r.work,r.result||'—'])];
-   const content=[{text:'ประวัติการซ่อมอุปกรณ์ความปลอดภัย',alignment:'center',bold:true,fontSize:21},{text:'งานจราจรและความปลอดภัย',alignment:'center',fontSize:17,margin:[0,0,0,14]},{text:target.item.name+' ('+target.item.id+')',bold:true,margin:[0,0,0,8]}];
-   if(target.rows.length)content.push({table:{headerRows:1,widths:[80,'*',120],body}});
-   else content.push({text:'ยังไม่มีประวัติการซ่อมที่บันทึกไว้'});
-   window.pdfMake.createPdf({pageSize:'A4',pageMargins:[34,36,34,45],defaultStyle:{font:'Sarabun',fontSize:15},content,footer:(p,n)=>({text:'หน้า '+p+' / '+n,alignment:'right',margin:[0,8,34,0]})},undefined,{Sarabun:{normal:'THSarabunNew.ttf',bold:'THSarabunNewBold.ttf'}},vfs).download('ประวัติการซ่อม-'+target.item.id+'.pdf');
+   await savePdf([target],true,'ประวัติการซ่อม-'+target.item.id+'.pdf',()=>generation===ticket);
   }catch(_){if(generation===ticket)message('สร้าง PDF ไม่สำเร็จ กรุณาลองอีกครั้ง',true);}
   finally{if(generation===ticket)pdf.disabled=false;}
+ });
+ const allPdf=$('equipment-fleet-pdf'), allState=$('equipment-fleet-status');
+ const setAllStatus=value=>{allState.hidden=false;allState.textContent=value;};
+ allPdf.addEventListener('click',async()=>{
+  if(allPdf.disabled)return;
+  allPdf.disabled=true;setAllStatus('กำลังเตรียม PDF อุปกรณ์ทั้งหมด…');
+  const endpoint=CONFIG.EQUIPMENT_REPAIR_HISTORY_URL, pending=new Set();
+  let failure='';
+  try{
+   const entries=items.map(item=>({item,rows:[]}));
+   if(endpoint){
+    let next=0,done=0;
+    const worker=async()=>{
+     while(!failure&&next<entries.length){
+      const entry=entries[next++], ctl=new AbortController();pending.add(ctl);
+      try{
+       entry.rows=await getRepairs(entry.item,endpoint,ctl);
+       if(!failure)setAllStatus('โหลดประวัติซ่อม '+(++done)+' จาก '+entries.length+' รายการ…');
+      }catch(_){
+       if(!failure)failure='โหลดประวัติซ่อมของ '+entry.item.name+' ไม่ได้ จึงยังไม่ได้ดาวน์โหลด PDF รวม';
+       throw Error('repair fetch failed');
+      }finally{pending.delete(ctl);}
+     }
+    };
+    await Promise.all(Array.from({length:Math.min(3,entries.length)},worker));
+   }
+   const filename=endpoint?'ประวัติการซ่อมอุปกรณ์ความปลอดภัย-ทั้งหมด.pdf':'รายการอุปกรณ์ความปลอดภัย-ทั้งหมด.pdf';
+   await savePdf(entries,Boolean(endpoint),filename);
+   setAllStatus('ดาวน์โหลด PDF '+entries.length+' รายการแล้ว'+(endpoint?'':' (เป็นรายการอุปกรณ์ ยังไม่มีข้อมูลการซ่อมในไฟล์)'));
+  }catch(_){
+   pending.forEach(ctl=>ctl.abort());
+   setAllStatus(failure||'สร้าง PDF ไม่สำเร็จ กรุณาลองอีกครั้ง');
+  }finally{allPdf.disabled=false;}
  });
 })();

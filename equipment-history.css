@@ -25,3 +25,5 @@
 .eq-toolbar h2,.eq-item h2,.eq-button{font-weight:700!important}
 .eq-button:hover:not(:disabled){filter:brightness(.96)}
 @media(max-width:460px){.eq-item{padding:12px}.eq-item-actions{justify-content:stretch}}
+
+@media(max-width:460px){.eq-inventory-actions{width:100%}}
