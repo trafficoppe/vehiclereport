@@ -179,18 +179,17 @@ function renderList(data, container, countBadge) {
         const model = item['ยี่ห้อ/รุ่น'] || '-';
         const color = item['สี'] || '-';
 
-        let borderClass = "border-start border-5"; 
-        let cardStyle = "background-color: #ffffff; border-left-color: #2e5831 !important;"; 
+        let stateClass = "";
         let statusBadge = "";
 
         if (inspectedLog[assetCode]) {
             const timeDiff = now - inspectedLog[assetCode].timestamp;
             if (timeDiff < 10 * 60 * 1000) { 
                 if (inspectedLog[assetCode].status === 'pass') {
-                    cardStyle = "background-color: #d1e7dd !important; border-left-color: #198754 !important;";
+                    stateClass = "vehicle-passed";
                     statusBadge = `<span class="badge bg-success shadow-sm px-2 py-1 fw-bold rounded" style="font-size: 12px;">ตรวจแล้ว</span>`;
                 } else {
-                    cardStyle = "background-color: #f8d7da !important; border-left-color: #dc3545 !important;";
+                    stateClass = "vehicle-damaged";
                     statusBadge = `<span class="badge shadow-sm px-2 py-1 fw-bold rounded" style="background-color: #dc3545; color: white; font-size: 12px;">ชำรุด</span>`;
                 }
             } else {
@@ -204,8 +203,7 @@ function renderList(data, container, countBadge) {
 
         let carouselId = "slide-" + Math.random().toString(36).substr(2, 5);
         let imageBlockHTML = `
-          <div id="${carouselId}" class="carousel slide me-3 flex-shrink-0" data-bs-ride="carousel" data-bs-interval="2500" 
-               style="width: 90px; height: 90px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.15);">
+          <div id="${carouselId}" class="carousel slide vehicle-photo flex-shrink-0" data-bs-ride="carousel" data-bs-interval="2500">
             <div class="carousel-inner" style="height: 100%;">
               <div class="carousel-item active" style="height: 100%; transition: transform 0.8s ease-in-out;">
                 <img src="${img1Src}" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.onerror=null; this.src='images/default.jpg';">
@@ -218,42 +216,34 @@ function renderList(data, container, countBadge) {
         `;
 
         container.insertAdjacentHTML('beforeend', `
-            <div class="card mb-3 shadow-sm border-0 ${borderClass} cursor-pointer" 
-                 style="${cardStyle}"
-                 onclick="openForm('${assetCode}', '${plate}', '${model}', '${type}')">
-                
-                <div class="card-body p-3 d-flex align-items-center">
-                    
+            <article class="card eq-item vehicle-item cursor-pointer ${stateClass}">
+                <div class="eq-item-label vehicle-label">
                     ${imageBlockHTML}
-                    
-                    <div class="flex-grow-1 d-flex flex-column justify-content-between" style="min-height: 90px;">
-                        
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div class="text-start mb-0" style="line-height: 1.4;">
-                                <div style="font-size: 15px; color: #000; font-weight: bold;">${type} ${model}</div>
-                                <div style="font-size: 14px; color: #000; font-weight: bold;">ทะเบียน: ${plate} (สี${color})</div>
-                                <div style="font-size: 14px; color: #000; font-weight: normal;">หมายเลข: ${assetCode}</div>
-                            </div>
-                            <div class="flex-shrink-0 ms-2">
-                                ${statusBadge}
-                            </div>
-                        </div>
-                        
-                        <div class="text-start d-flex flex-wrap gap-2 mt-auto pt-2">
-                            <button class="btn btn-warning btn-sm rounded-pill fw-bold px-3 shadow-sm" style="color: #000;"
-                                    onclick="event.stopPropagation(); window.location.href='maintenance_form.html?dept=${deptKey}&assetCode=${assetCode}&model=${encodeURIComponent(model)}';">
-                                ซ่อมบำรุง
-                            </button>
-                            <button class="btn btn-dark btn-sm rounded-pill fw-bold px-3 shadow-sm" style="color: #fff;"
-                                    data-vehicle-history>
-                                ประวัติ
-                            </button>
-                        </div>
-
+                    <div class="vehicle-details">
+                        <h2>${type} ${model}</h2>
+                        <p class="eq-description">ทะเบียน: ${plate} (สี${color})</p>
+                        <p class="eq-description">หมายเลข: ${assetCode}</p>
+                        ${statusBadge}
                     </div>
                 </div>
-            </div>
+                <div class="eq-item-actions vehicle-actions">
+                    <button type="button" class="eq-button eq-primary" data-vehicle-inspect>ตรวจ</button>
+                    <button type="button" class="eq-button" data-vehicle-maintenance>ซ่อมบำรุง</button>
+                    <button type="button" class="eq-button" data-vehicle-history>ประวัติ</button>
+                </div>
+            </article>
         `);
+        const card = container.lastElementChild;
+        card.addEventListener('click', event => {
+            if (!event.target.closest('button') || event.target.closest('[data-vehicle-inspect]')) {
+                openForm(assetCode, plate, model, type);
+            }
+        });
+        card.querySelector('[data-vehicle-maintenance]').addEventListener('click', event => {
+            event.stopPropagation();
+            const params = new URLSearchParams({dept: deptKey, assetCode, model});
+            window.location.href = 'maintenance_form.html?' + params.toString();
+        });
         const historyButton = container.lastElementChild.querySelector('[data-vehicle-history]');
         historyButton.addEventListener('click', event => {
             event.stopPropagation();

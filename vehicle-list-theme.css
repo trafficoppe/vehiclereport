@@ -1,0 +1,33 @@
+/* Vehicle inventory shares the equipment page's card and button styles. */
+.vehicle-back-icon{vertical-align:-.15em;margin-inline-end:.2rem}
+#page-list{color:#243d2a}
+#page-list .vehicle-toolbar{margin-bottom:12px}
+#page-list .vehicle-count{border-radius:10px;background:#edf5ea;color:#31583c;padding:5px 10px;font-size:.875rem!important;font-weight:700!important}
+#page-list .vehicle-tools{display:flex;align-items:stretch;gap:9px;margin-bottom:16px}
+#page-list .vehicle-search{min-width:0;min-height:42px;border-color:#dce8dc;border-radius:9px;color:#244731}
+#page-list .vehicle-search:focus{border-color:#528257;box-shadow:0 0 0 3px #52825728}
+#page-list .vehicle-tools-actions{display:flex;gap:7px;flex-shrink:0}
+#page-list .eq-button{white-space:nowrap}
+#page-list .vehicle-item{flex-direction:row;align-items:center;gap:12px}
+#page-list .vehicle-label{align-items:center;gap:12px;flex:1}
+#page-list .vehicle-details{min-width:0;overflow-wrap:anywhere}
+#page-list .vehicle-details h2{line-height:1.35}
+#page-list .vehicle-photo{width:76px;height:76px;border-radius:10px;overflow:hidden;border:1px solid #dce8dc;background:#edf5ea}
+#page-list .vehicle-actions .eq-button{font-size:.875rem!important}
+#page-list .vehicle-item:hover{border-color:#a7bea2}
+#page-list .vehicle-item.vehicle-passed{background:#edf5ea;border-color:#b5d2b9}
+#page-list .vehicle-item.vehicle-damaged{background:#fff2f2;border-color:#e9b8bd}
+#page-list .vehicle-details .badge{margin-top:5px;font-size:.75rem!important;font-weight:700!important}
+#page-list .vehicle-damaged .badge{background:#f9dce0!important;color:#842029!important}
+@media(max-width:680px){
+  #page-list .vehicle-item{align-items:stretch;flex-direction:column}
+  #page-list .vehicle-actions .eq-button{flex:1;width:auto}
+}
+@media(max-width:460px){
+  #page-list .vehicle-tools{flex-direction:column}
+  #page-list .vehicle-tools-actions .eq-button{flex:1;width:auto}
+}
+@media(max-width:355px){
+  #page-list .vehicle-actions .eq-button{padding-inline:.45rem}
+  #page-list .vehicle-photo{width:60px;height:60px}
+}
