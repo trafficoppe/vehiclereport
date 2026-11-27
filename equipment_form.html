@@ -7,7 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="equipment-history.css?v=6">
+    <link rel="stylesheet" href="equipment-history.css?v=7">
 </head>
 <body style="background-color: #f4f6f9;">
 
@@ -48,9 +48,13 @@
 </dialog>
 <dialog id="equipment-check-history" aria-labelledby="check-history-title">
   <div class="eq-toolbar"><h2 id="check-history-title"></h2><button id="check-history-close" class="eq-button" type="button">ปิด</button></div>
+  <div id="check-history-tools" class="eq-toolbar eq-check-tools" hidden>
+    <label for="check-history-year">ปี พ.ศ. <select id="check-history-year"></select></label>
+    <button id="check-history-pdf" type="button" class="eq-button eq-primary">ดาวน์โหลด PDF</button>
+  </div>
   <p id="check-history-state" role="status" aria-live="polite"></p>
   <div class="table-responsive" id="check-history-table" hidden>
-    <table class="table table-sm"><thead><tr><th scope="col">วันที่</th><th scope="col">ผลการตรวจ</th></tr></thead><tbody id="check-history-rows"></tbody></table>
+    <table class="table table-sm"><thead><tr><th scope="col">เดือน</th><th scope="col">ผลการตรวจ</th><th scope="col">วันที่</th></tr></thead><tbody id="check-history-rows"></tbody></table>
   </div>
 </dialog>
                 <form id="equipment-form" hidden>
@@ -139,7 +143,7 @@
     <script src="config.js"></script>
     <script src="inspection-date.js?v=1"></script>
     <script src="assets/vehicle-pdf/pdfmake.min.js" defer></script>
-    <script src="equipment-history.js?v=20261127-inspections" defer></script>
+    <script src="equipment-history.js?v=20261127-monthly" defer></script>
     <script>
         const inspectDateField = document.getElementById('inspectDate');
         function resetEquipmentInspectionDate() {

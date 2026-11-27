@@ -67,9 +67,51 @@
  }
 
  const checks=$('equipment-check-history'), checkState=$('check-history-state'), checkRows=$('check-history-rows'), checkTable=$('check-history-table');
+ const checkYear=$('check-history-year'), checkPdf=$('check-history-pdf'), checkTools=$('check-history-tools');
+ const checkMonths=["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+ let checkCurrent=null;
+ function checkMonthly(rows,year){
+  const months=Array(12).fill(null);
+  for(const r of rows){
+   if(Number(r.date.slice(0,4))!==year)continue;
+   const i=Number(r.date.slice(5,7))-1, old=months[i];
+   if(!old||r.date>old.date||(r.date===old.date&&old.legacy&&!r.legacy))months[i]=r;
+  }
+  return months.map((row,i)=>({row,month:checkMonths[i]}));
+ }
+ const checkCondition=r=>!r?'ยังไม่มีผลตรวจ':r.condition==='ready'?'พร้อมใช้งาน':'ไม่พร้อมใช้งาน';
+ const checkDate=r=>r?dateLabel(r.date)+(r.legacy?' (วันที่บันทึก)':''):'–';
+ function renderCheckYear(){
+  if(!checkCurrent)return;
+  const year=Number(checkYear.value), view=checkMonthly(checkCurrent.rows,year);
+  checkRows.replaceChildren();
+  for(const {row,month} of view){
+   const tr=term('tr'), label=term('th',month);label.scope='row';
+   const result=term('td');result.append(term('span',checkCondition(row),'eq-check-'+(row?.condition??'none')));
+   tr.append(label,result,term('td',checkDate(row)));checkRows.append(tr);
+  }
+  checkState.textContent='แสดงผลตรวจล่าสุดของแต่ละเดือน ('+view.filter(x=>x.row).length+' จาก 12 เดือน)';
+ }
+ checkYear.addEventListener('change',renderCheckYear);
+ checkPdf.addEventListener('click',async()=>{
+  if(!checkCurrent||checkPdf.disabled)return;
+  const snapshot=checkCurrent, year=Number(checkYear.value);checkPdf.disabled=true;
+  try{
+   const title='ประวัติการตรวจอุปกรณ์รายเดือน';
+   const body=[['เดือน','ผลการตรวจ','วันที่'].map(text=>({text,bold:true,fillColor:'#edf5ea'})),
+    ...checkMonthly(snapshot.rows,year).map(({month,row})=>[month,{text:checkCondition(row),color:row?.condition==='defect'?'#9c2121':'#244731'},checkDate(row)])];
+   const definition={pageSize:'A4',pageMargins:[42,42,42,44],info:{title},defaultStyle:{font:'Sarabun',fontSize:15},content:[
+    {text:title,alignment:'center',bold:true,fontSize:22},
+    {text:snapshot.item.name+' | ปี พ.ศ. '+(year+543),alignment:'center',fontSize:17,margin:[0,4,0,14]},
+    {table:{headerRows:1,dontBreakRows:true,widths:['*','*','*'],body},layout:'lightHorizontalLines'},
+    {text:'เดือนที่ตรวจหลายครั้งแสดงผลล่าสุด • วันที่บันทึกใช้เฉพาะรายการเดิมที่ไม่มีวันที่ตรวจ',fontSize:12,margin:[0,10,0,0]}]};
+   await savePdf([],false,'ประวัติการตรวจ-'+snapshot.item.id+'-'+(year+543)+'.pdf',()=>checkCurrent===snapshot&&String(year)===checkYear.value,definition);
+  }catch(_){if(checkCurrent===snapshot)checkState.textContent='สร้าง PDF ไม่สำเร็จ กรุณาลองใหม่';}
+  finally{if(checkCurrent===snapshot)checkPdf.disabled=false;}
+ });
  let checkOpener=null, checkRequest=null;
  function closeChecks(){
-  checkRequest?.abort();checkRequest=null;
+  checkRequest?.abort();checkRequest=null;checkCurrent=null;
   if(checks.open)checks.close();
   checkOpener?.focus();checkOpener=null;
  }
@@ -78,7 +120,7 @@
  async function openChecks(item,from){
   checkRequest?.abort();
   const request=new AbortController();checkRequest=request;checkOpener=from;
-  checkRows.replaceChildren();checkTable.hidden=true;
+  checkCurrent=null;checkRows.replaceChildren();checkTable.hidden=checkTools.hidden=true;checkPdf.disabled=false;
   $('check-history-title').textContent='ประวัติการตรวจ: '+item.name;
   checkState.textContent='กำลังโหลดประวัติการตรวจ…';
   if(!checks.open)checks.showModal();
@@ -94,14 +136,12 @@
    if(data?.status!=='success'||data.itemId!==item.id||!Array.isArray(data.rows)||data.rows.length>100||
     !data.rows.every(row=>iso(row?.date)&&['ready','defect'].includes(row.condition)&&typeof row.legacy==='boolean'))throw Error('history');
    if(checkRequest!==request)return;
-   for(const row of data.rows){
-    const tr=term('tr');
-    tr.append(term('td',dateLabel(row.date)+(row.legacy?' (วันที่บันทึก)':'')),
-     term('td',row.condition==='ready'?'พร้อมใช้งาน':'ชำรุด'));
-    checkRows.append(tr);
-   }
-   checkTable.hidden=!data.rows.length;
-   checkState.textContent=data.rows.length?'แสดง '+data.rows.length+' ผลตรวจล่าสุด':'ยังไม่มีผลตรวจของอุปกรณ์นี้';
+   const now=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Bangkok',year:'numeric'}).format(new Date()));
+   const years=[...new Set([now,...data.rows.map(x=>Number(x.date.slice(0,4)))])].sort((a,b)=>b-a);
+   checkYear.replaceChildren(...years.map(y=>{const o=term('option',String(y+543));o.value=String(y);return o;}));
+   checkYear.value=String(now);
+   checkCurrent={item,rows:data.rows};
+   checkTable.hidden=checkTools.hidden=false;renderCheckYear();
   }catch(_){
    if(checkRequest===request)checkState.textContent='โหลดประวัติการตรวจไม่ได้ กรุณาลองใหม่อีกครั้ง';
   }finally{clearTimeout(timeout);if(checkRequest===request)checkRequest=null;}
@@ -153,10 +193,10 @@
    pageBreakBefore:(node,following)=>node.headlineLevel===1&&following.length===0,
    footer:(p,n)=>({text:'หน้า '+p+' / '+n,alignment:'right',margin:[0,8,34,0]})};
  }
- async function savePdf(entries,connected,name,canSave=()=>true){
+ async function savePdf(entries,connected,name,canSave=()=>true,definition=pdfDefinition(entries,connected)){
   const vfs=await fontFiles();
   if(!canSave())return false;
-  const builder=window.pdfMake.createPdf(pdfDefinition(entries,connected),undefined,
+  const builder=window.pdfMake.createPdf(definition,undefined,
    {Sarabun:{normal:'THSarabunNew.ttf',bold:'THSarabunNewBold.ttf'}},vfs);
   const blob=await new Promise((resolve,reject)=>{
    const result=builder.getBlob(resolve);if(result?.catch)result.catch(reject);
