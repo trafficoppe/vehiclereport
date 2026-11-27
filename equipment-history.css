@@ -11,9 +11,9 @@
 .eq-button:active:not(:disabled){transform:translateY(2px);box-shadow:none}
 .eq-button:focus-visible{outline:2px solid #307f49;outline-offset:3px}
 .eq-button:disabled{opacity:.65;cursor:wait}
-#repair-history{width:min(760px,calc(100% - 24px));border:1px solid #c9dfce;border-radius:14px;padding:18px;color:#173625;box-shadow:0 18px 48px #183b2940}
-#repair-history::backdrop{background:#193c2e85}
-#repair-title{font-size:1.1rem}
+#repair-history,#equipment-check-history{width:min(760px,calc(100% - 24px));border:1px solid #c9dfce;border-radius:14px;padding:18px;color:#173625;box-shadow:0 18px 48px #183b2940}
+#repair-history::backdrop,#equipment-check-history::backdrop{background:#193c2e85}
+#repair-title,#check-history-title{font-size:1.1rem}
 #repair-rows td{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:390px){.eq-item{align-items:stretch;flex-direction:column}.eq-button{width:100%}}
 .eq-item-actions{display:flex;flex-wrap:wrap;gap:7px;justify-content:flex-end;flex-shrink:0}.eq-item-actions .eq-button{white-space:nowrap}@media(max-width:460px){.eq-item{align-items:stretch;flex-direction:column}.eq-item-actions .eq-button{flex:1;width:auto}}
@@ -27,3 +27,5 @@
 @media(max-width:460px){.eq-item{padding:12px}.eq-item-actions{justify-content:stretch}}
 
 @media(max-width:460px){.eq-inventory-actions{width:100%}}
+.eq-history-actions{max-width:52%}
+@media(max-width:590px){.eq-item{align-items:stretch;flex-direction:column}.eq-history-actions{max-width:none}.eq-history-actions .eq-button{flex:1;width:auto}}

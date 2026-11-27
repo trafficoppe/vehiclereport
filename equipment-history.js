@@ -65,6 +65,47 @@
   }catch(_){if(seq===ticket)message('โหลดประวัติการซ่อมไม่ได้ กรุณาตรวจการเชื่อมต่อหรือสิทธิ์ แล้วเปิดใหม่อีกครั้ง',true);}
   finally{if(seq===ticket)active=null;}
  }
+
+ const checks=$('equipment-check-history'), checkState=$('check-history-state'), checkRows=$('check-history-rows'), checkTable=$('check-history-table');
+ let checkOpener=null, checkRequest=null;
+ function closeChecks(){
+  checkRequest?.abort();checkRequest=null;
+  if(checks.open)checks.close();
+  checkOpener?.focus();checkOpener=null;
+ }
+ $('check-history-close').addEventListener('click',closeChecks);
+ checks.addEventListener('cancel',e=>{e.preventDefault();closeChecks();});
+ async function openChecks(item,from){
+  checkRequest?.abort();
+  const request=new AbortController();checkRequest=request;checkOpener=from;
+  checkRows.replaceChildren();checkTable.hidden=true;
+  $('check-history-title').textContent='ประวัติการตรวจ: '+item.name;
+  checkState.textContent='กำลังโหลดประวัติการตรวจ…';
+  if(!checks.open)checks.showModal();
+  $('check-history-close').focus();
+  const timeout=setTimeout(()=>request.abort(),12000);
+  try{
+   const url=new URL(CONFIG.GAS_URL);
+   url.searchParams.set('action','equipment_inspection_history');
+   url.searchParams.set('itemId',item.id);
+   const res=await fetch(url,{cache:'no-store',credentials:'omit',signal:request.signal});
+   if(!res.ok)throw Error('history');
+   const data=await res.json();
+   if(data?.status!=='success'||data.itemId!==item.id||!Array.isArray(data.rows)||data.rows.length>100||
+    !data.rows.every(row=>iso(row?.date)&&['ready','defect'].includes(row.condition)&&typeof row.legacy==='boolean'))throw Error('history');
+   if(checkRequest!==request)return;
+   for(const row of data.rows){
+    const tr=term('tr');
+    tr.append(term('td',dateLabel(row.date)+(row.legacy?' (วันที่บันทึก)':'')),
+     term('td',row.condition==='ready'?'พร้อมใช้งาน':'ชำรุด'));
+    checkRows.append(tr);
+   }
+   checkTable.hidden=!data.rows.length;
+   checkState.textContent=data.rows.length?'แสดง '+data.rows.length+' ผลตรวจล่าสุด':'ยังไม่มีผลตรวจของอุปกรณ์นี้';
+  }catch(_){
+   if(checkRequest===request)checkState.textContent='โหลดประวัติการตรวจไม่ได้ กรุณาลองใหม่อีกครั้ง';
+  }finally{clearTimeout(timeout);if(checkRequest===request)checkRequest=null;}
+ }
  for(const [i,item] of items.entries()){
   const card=term('article','','eq-item'), head=term('div','','eq-item-label');
   const description=term('div');description.append(term('h2',item.name),term('p',item.description,'eq-description'));
@@ -73,7 +114,9 @@
   action.setAttribute('aria-label','ประวัติการซ่อม '+item.name);action.addEventListener('click',()=>open(item,action));
   const inspect=term('button','ตรวจ','eq-button eq-primary');inspect.type='button';inspect.setAttribute('aria-label','เริ่มตรวจทั้ง '+items.length+' รายการ ที่ '+item.name);inspect.setAttribute('aria-describedby','equipment-list-scope');
   inspect.addEventListener('click',()=>setPanel(true,item,inspect));
-  const actions=term('div','','eq-item-actions');actions.append(action,inspect);card.append(head,actions);list.append(card);
+  const check=term('button','ประวัติการตรวจ','eq-button eq-secondary');check.type='button';
+  check.setAttribute('aria-label','ประวัติการตรวจ '+item.name);check.addEventListener('click',()=>openChecks(item,check));
+  const actions=term('div','','eq-item-actions eq-history-actions');actions.append(check,action,inspect);card.append(head,actions);list.append(card);
  }
  let fonts;
  async function fontFiles(){
