@@ -80,7 +80,7 @@
   return months.map((row,i)=>({row,month:checkMonths[i]}));
  }
  const checkCondition=r=>!r?'ยังไม่มีผลตรวจ':r.condition==='ready'?'พร้อมใช้งาน':'ไม่พร้อมใช้งาน';
- const checkDate=r=>r?dateLabel(r.date)+(r.legacy?' (วันที่บันทึก)':''):'–';
+ const checkInspector=r=>r?.inspector?.trim()||'-';
  function renderCheckYear(){
   if(!checkCurrent)return;
   const year=Number(checkYear.value), view=checkMonthly(checkCurrent.rows,year);
@@ -88,7 +88,7 @@
   for(const {row,month} of view){
    const tr=term('tr'), label=term('th',month);label.scope='row';
    const result=term('td');result.append(term('span',checkCondition(row),'eq-check-'+(row?.condition??'none')));
-   tr.append(label,result,term('td',checkDate(row)));checkRows.append(tr);
+   tr.append(label,result,term('td',checkInspector(row)));checkRows.append(tr);
   }
   checkState.textContent='แสดงผลตรวจล่าสุดของแต่ละเดือน ('+view.filter(x=>x.row).length+' จาก 12 เดือน)';
  }
@@ -97,14 +97,30 @@
   if(!checkCurrent||checkPdf.disabled)return;
   const snapshot=checkCurrent, year=Number(checkYear.value);checkPdf.disabled=true;
   try{
-   const title='ประวัติการตรวจอุปกรณ์รายเดือน';
-   const body=[['เดือน','ผลการตรวจ','วันที่'].map(text=>({text,bold:true,fillColor:'#edf5ea'})),
-    ...checkMonthly(snapshot.rows,year).map(({month,row})=>[month,{text:checkCondition(row),color:row?.condition==='defect'?'#9c2121':'#244731'},checkDate(row)])];
-   const definition={pageSize:'A4',pageMargins:[42,42,42,44],info:{title},defaultStyle:{font:'Sarabun',fontSize:15},content:[
-    {text:title,alignment:'center',bold:true,fontSize:22},
-    {text:snapshot.item.name+' | ปี พ.ศ. '+(year+543),alignment:'center',fontSize:17,margin:[0,4,0,14]},
-    {table:{headerRows:1,dontBreakRows:true,widths:['*','*','*'],body},layout:'lightHorizontalLines'},
-    {text:'เดือนที่ตรวจหลายครั้งแสดงผลล่าสุด • วันที่บันทึกใช้เฉพาะรายการเดิมที่ไม่มีวันที่ตรวจ',fontSize:12,margin:[0,10,0,0]}]};
+   const title='รายงานประวัติการตรวจอุปกรณ์';
+   const view=checkMonthly(snapshot.rows,year);
+   const thin={hLineWidth:()=>.55,vLineWidth:()=>.55,hLineColor:()=>'#000',vLineColor:()=>'#000',
+    paddingTop:()=>.95,paddingBottom:()=>.95,paddingLeft:()=>4,paddingRight:()=>4};
+   const headers=['เดือน','ผลการตรวจ','ชื่อผู้ตรวจ'].map((text,i)=>({text,bold:true,alignment:i?'center':'left'}));
+   const body=[headers,...view.map(({month,row})=>[
+    {text:month,bold:true},{text:row?checkCondition(row):'-',alignment:'center',bold:row?.condition==='defect'},
+    {text:checkInspector(row),alignment:'center'}
+   ])];
+   const reportDate=new Intl.DateTimeFormat('th-TH-u-ca-buddhist-nu-latn',{timeZone:'Asia/Bangkok',dateStyle:'medium'}).format(new Date());
+   const definition={pageSize:'A4',pageOrientation:'landscape',pageMargins:[28,24,28,24],
+    info:{title,subject:'ประวัติการตรวจอุปกรณ์'},defaultStyle:{font:'Sarabun',fontSize:13,color:'#000',lineHeight:1.0},
+    footer:(page,pages)=>({text:page+' / '+pages,alignment:'right',fontSize:11,margin:[28,4]}),
+    content:[
+     {text:title,alignment:'center',bold:true,fontSize:29},
+     {text:'ประจำปี พ.ศ. '+(year+543)+' | กองกายภาพและสิ่งแวดล้อม มหาวิทยาลัยมหิดล',alignment:'center',fontSize:15,margin:[0,3,0,12]},
+     {table:{widths:['*','*'],body:[[
+      {text:[{text:'อุปกรณ์: ',bold:true},snapshot.item.name]},
+      {text:[{text:'หน่วยงาน: ',bold:true},'งานจราจรและความปลอดภัย']}
+     ]]},layout:thin},
+     {text:[{text:'สรุป: ',bold:true},'มีข้อมูล '+view.filter(x=>x.row).length+' เดือน · แสดงผลล่าสุดเดือนละ 1 รายการ  |  ข้อมูล ณ วันที่ '+reportDate],margin:[0,7,0,4]},
+     {table:{headerRows:1,dontBreakRows:true,widths:[125,210,'*'],body},layout:thin},
+     {text:[{text:'คำอธิบาย: ',bold:true},'ขีด (-) ในช่องผลการตรวจ = ไม่มีข้อมูลตรวจ  ·  ขีด (-) ในช่องชื่อผู้ตรวจ = ไม่มีชื่อที่บันทึกไว้'],margin:[0,7,0,3]}
+    ]};
    await savePdf([],false,'ประวัติการตรวจ-'+snapshot.item.id+'-'+(year+543)+'.pdf',()=>checkCurrent===snapshot&&String(year)===checkYear.value,definition);
   }catch(_){if(checkCurrent===snapshot)checkState.textContent='สร้าง PDF ไม่สำเร็จ กรุณาลองใหม่';}
   finally{if(checkCurrent===snapshot)checkPdf.disabled=false;}
@@ -134,7 +150,7 @@
    if(!res.ok)throw Error('history');
    const data=await res.json();
    if(data?.status!=='success'||data.itemId!==item.id||!Array.isArray(data.rows)||data.rows.length>100||
-    !data.rows.every(row=>iso(row?.date)&&['ready','defect'].includes(row.condition)&&typeof row.legacy==='boolean'))throw Error('history');
+    !data.rows.every(row=>iso(row?.date)&&['ready','defect'].includes(row.condition)&&typeof row.legacy==='boolean'&&(row.inspector===undefined||(typeof row.inspector==='string'&&row.inspector.length<=160))))throw Error('history');
    if(checkRequest!==request)return;
    const now=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Bangkok',year:'numeric'}).format(new Date()));
    const years=[...new Set([now,...data.rows.map(x=>Number(x.date.slice(0,4)))])].sort((a,b)=>b-a);

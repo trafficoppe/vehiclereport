@@ -54,7 +54,7 @@
   </div>
   <p id="check-history-state" role="status" aria-live="polite"></p>
   <div class="table-responsive" id="check-history-table" hidden>
-    <table class="table table-sm"><thead><tr><th scope="col">เดือน</th><th scope="col">ผลการตรวจ</th><th scope="col">วันที่</th></tr></thead><tbody id="check-history-rows"></tbody></table>
+    <table class="table table-sm"><thead><tr><th scope="col">เดือน</th><th scope="col">ผลการตรวจ</th><th scope="col">ชื่อผู้ตรวจ</th></tr></thead><tbody id="check-history-rows"></tbody></table>
   </div>
 </dialog>
                 <form id="equipment-form" hidden>
@@ -143,7 +143,7 @@
     <script src="config.js"></script>
     <script src="inspection-date.js?v=1"></script>
     <script src="assets/vehicle-pdf/pdfmake.min.js" defer></script>
-    <script src="equipment-history.js?v=20261127-monthly" defer></script>
+    <script src="equipment-history.js?v=20261127-inspector" defer></script>
     <script>
         const inspectDateField = document.getElementById('inspectDate');
         function resetEquipmentInspectionDate() {
